@@ -1,2 +1,5 @@
 .env
 Yak2048/
+__pycache__/
+versions/
+app/giftme/test_db_connection.py
