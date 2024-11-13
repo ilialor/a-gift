@@ -1,4 +1,3 @@
-# filepath: /d:/A-Gift/app/giftme/config.py
 import logging  # Added import
 
 from pydantic_settings import BaseSettings

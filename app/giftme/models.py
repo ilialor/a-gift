@@ -1,13 +1,14 @@
 from typing import List
-from sqlalchemy import ARRAY, JSON, ForeignKey, Integer, String, Table, Enum, text, Column, DateTime
+from sqlalchemy import ARRAY, JSON, ForeignKey, Integer, String, Table, text, Column, DateTime, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
-from database import Base, uniq_str_an
+from app.dao.database import Base, uniq_str_an, array_or_none_an
 
 class User(Base):
     username: Mapped[uniq_str_an]
     email: Mapped[uniq_str_an]
     password: Mapped[str]
+    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     profile: Mapped['Profile'] = relationship(
         'Profile',
         back_populates='user',
@@ -26,7 +27,7 @@ class Profile(Base):
     first_name: Mapped[str]
     last_name: Mapped[str | None]
     age: Mapped[int | None]
-    interests: Mapped[List[str] | None] = mapped_column(ARRAY(String))
+    interests: Mapped[array_or_none_an]
     contacts: Mapped[dict | None] = mapped_column(JSON)
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), unique=True)
     user: Mapped['User'] = relationship('User', back_populates='profile')
