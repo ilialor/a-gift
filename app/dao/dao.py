@@ -93,4 +93,3 @@ class GiftListDAO(BaseDAO[GiftList]):
 
 class UserListDAO(BaseDAO[UserList]):
     model = UserList
-   

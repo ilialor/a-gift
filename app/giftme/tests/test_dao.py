@@ -45,32 +45,39 @@ class TestUserDAO(AsyncTestCase):
             res2 = await session.execute(select(User))
             print(res2.scalars().all())
             self.assertEqual(res2.scalars().all(), [])
+            
+    async def test_remove_all_users(self):
+        async with self.async_session() as session:
+            await session.execute(text("DELETE FROM users"))
+            await session.commit()
+            users = await UserDAO.get_all_users(session)
+            self.assertEqual(users, [])
 
-    # async def test_add_user(self):
-    #     # Test adding a new user
-    #     async with self.async_session() as session:
-    #         user_data = UserPydantic(
-    #             username="testuser",
-    #             email="testuser@example.com",
-    #             password="securepassword"
-    #         )
-    #         user = await UserDAO.add(session, user_data)
-    #         self.assertIsNotNone(user.id)
-    #         self.assertEqual(user.username, "testuser")
+    async def test_add_user(self):
+        # Test adding a new user
+        async with self.async_session() as session:
+            user_data = UserPydantic(
+                username="testuser3",
+                email="testuser3@example.com",
+                password="securepassword"
+            )
+            user = await UserDAO.add(session, user_data)
+            self.assertIsNotNone(user.id)
+            self.assertEqual(user.username, "testuser3")
 
-    # async def test_find_one_or_none_user(self):
-    #     # Test finding a user by filters
-    #     async with self.async_session() as session:
-    #         user_data = UserPydantic(
-    #             username="testuser",
-    #             email="testuser@example.com",
-    #             password="securepassword"
-    #         )
-    #         await UserDAO.add(session, user_data)
-    #         filters = UserPydantic(username="testuser")
-    #         user = await UserDAO.find_one_or_none(session, filters)
-    #         self.assertIsNotNone(user)
-    #         self.assertEqual(user.email, "testuser@example.com")
+    async def test_find_one_or_none_user(self):
+        # Test finding a user by filters
+        async with self.async_session() as session:
+            user_data = UserPydantic(
+                username="testuser4",
+                email="testuser4@example.com",
+                password="securepassword"
+            )
+            await UserDAO.add(session, user_data)
+            filters = UserPydantic(username="testuser4")
+            user = await UserDAO.find_one_or_none(session, filters)
+            self.assertIsNotNone(user)
+            self.assertEqual(user.email, "testuser4@example.com")
     
     # async def test_get_top_scores(self):
     #     # Test retrieving top scores
