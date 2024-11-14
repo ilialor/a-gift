@@ -13,6 +13,9 @@ T = TypeVar("T", bound=Base)
 class BaseDAO(Generic[T]):
     model: type[T]
 
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
     @classmethod
     async def find_one_or_none_by_id(cls, data_id: int, session: AsyncSession):
         # Найти запись по ID
