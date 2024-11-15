@@ -1,3 +1,4 @@
+import logging  # Add this import
 from functools import wraps
 from typing import Optional
 from sqlalchemy import text
@@ -5,6 +6,10 @@ from app.dao.database import async_session_maker
 from app.config import settings
 
 DATABASE_URL = settings.get_db_url()
+
+# Configure logging if not already configured
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def connection(isolation_level: Optional[str] = None, commit: bool = True):
     """
@@ -25,6 +30,7 @@ def connection(isolation_level: Optional[str] = None, commit: bool = True):
                         await session.commit()
                     return result
                 except Exception as e:
+                    logger.error(f"Error in {method.__name__}: {e}")  # Add logging
                     await session.rollback()
                     raise
                 finally:

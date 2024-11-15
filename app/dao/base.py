@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar, List
+from typing import Generic, TypeVar, List, Type, Optional
 from pydantic import BaseModel
 from sqlalchemy import select, update, delete
 from sqlalchemy.exc import SQLAlchemyError
@@ -8,13 +8,19 @@ from app.dao.database import Base
 
 # Объявляем типовой параметр T с ограничением, что это наследник Base
 T = TypeVar("T", bound=Base)
+ModelType = TypeVar('ModelType', bound=Base)
 
 
-class BaseDAO(Generic[T]):
-    model: type[T]
+class BaseDAO(Generic[ModelType]):
+    model: Type[ModelType]
 
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def find_one_or_none(self, **kwargs) -> Optional[ModelType]:
+        stmt = select(self.model).where(**kwargs)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
 
     @classmethod
     async def find_one_or_none_by_id(cls, data_id: int, session: AsyncSession):

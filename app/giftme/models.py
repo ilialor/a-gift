@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from sqlalchemy import ARRAY, JSON, ForeignKey, Integer, String, Table, Enum, Text, text, Column, DateTime, BigInteger, PrimaryKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
@@ -8,8 +8,8 @@ from enum import Enum as PyEnum
 
 class User(Base):
     username: Mapped[uniq_str_an]
-    email: Mapped[uniq_str_an]
-    password: Mapped[str]
+    email: Mapped[Optional[uniq_str_an]] = mapped_column(unique=True, nullable=True)
+    password: Mapped[Optional[uniq_str_an]] = mapped_column(unique=False, nullable=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     profile: Mapped['Profile'] = relationship(
         'Profile',

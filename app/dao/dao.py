@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from app.dao.base import BaseDAO
 from app.giftme.models import Gift, GiftList, Payment, User, Profile, UserList
+from app.giftme.schemas import UserPydantic
 
 
 class UserDAO(BaseDAO[User]):
@@ -77,6 +78,25 @@ class UserDAO(BaseDAO[User]):
         result = await session.execute(query)  # Выполняем асинхронный запрос
         records = result.all()  # Получаем все результаты
         return records  # Возвращаем список записей
+
+    @staticmethod
+    async def add(session: AsyncSession, values: UserPydantic) -> UserPydantic:
+        user = User(
+            telegram_id=values.telegram_id,
+            username=values.username,
+            email=values.email,
+            profile=Profile(
+                first_name=values.profile.first_name,
+                last_name=values.profile.last_name,
+                date_of_birth=values.profile.date_of_birth,
+                interests=values.profile.interests,
+                contacts=values.profile.contacts,
+            ) if values.profile else None
+        )
+        session.add(user)
+        await session.flush()
+        await session.commit()
+        return UserPydantic.from_orm(user)  # Return Pydantic model
 
     async def create_user(self, user_data: dict) -> User:
         user = self.model(

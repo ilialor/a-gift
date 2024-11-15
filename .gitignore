@@ -10,3 +10,10 @@ pytest.ini
 .vscode/settings.json
 app/giftme/tests/test_dao.py
 app/test_dao.py
+__init__.py
+**\__init__.py
+static/
+
+app/templates/old_base.html
+app/templates/pages/old_index.html
+app/templates/pages/records.html
