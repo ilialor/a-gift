@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 from pydantic import BaseModel, ConfigDict
 
@@ -5,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 class ProfilePydantic(BaseModel):
     first_name: str
     last_name: str | None
-    age: int | None
+    date_of_birth: datetime.date | None
     interests: List[str] | None
     contacts: dict | None
 

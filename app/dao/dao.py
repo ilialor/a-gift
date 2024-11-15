@@ -1,6 +1,7 @@
 from typing import Optional
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
 from app.dao.base import BaseDAO
 from app.giftme.models import Gift, GiftList, Payment, User, Profile, UserList
 
@@ -42,7 +43,7 @@ class UserDAO(BaseDAO[User]):
             user_id=user.id,
             first_name=user_data['first_name'],
             last_name=user_data.get('last_name'),
-            age=user_data.get('age'),
+            date_of_birth=user_data.get('date_of_birth'),
             interests=user_data.get('interests'),
             contacts=user_data.get('contacts')
         )
@@ -147,20 +148,69 @@ class GiftListDAO(BaseDAO[GiftList]):
 class UserListDAO(BaseDAO[UserList]):
     model = UserList
 
-    async def add_user_to_list(self, user_list_data: dict) -> UserList:
-        user_list = self.model(**user_list_data)
-        self.session.add(user_list)
-        await self.session.commit()
-        return user_list
+    async def add_user_to_list(self, user_list_data: dict) -> Optional[dict]:
+        """
+        Adds a user to a user list with name and description using ORM.
+        """
+        try:
+            # Fetch the current maximum ID
+            result = await self.session.execute(select(func.max(UserList.id)))
+            max_id = result.scalar() or 0
+            new_id = max_id + 1
 
-    async def remove_user_from_list(self, user_list_data: dict):
-        stmt = select(self.model).where(
-            self.model.user_id == user_list_data["user_id"],
-            self.model.list_id == user_list_data["list_id"],
-            self.model.related_user_id == user_list_data["related_user_id"]
-        )
-        result = await self.session.execute(stmt)
-        user_list = result.scalars().first()
-        if user_list:
-            await self.session.delete(user_list)
+            user_list = self.model(
+                id=new_id,  # Explicitly set the ID
+                user_id=user_list_data["user_id"],
+                gift_list_id=user_list_data["gift_list_id"],
+                added_user_id=user_list_data["added_user_id"],
+                name=user_list_data["name"],
+                description=user_list_data.get("description")
+            )
+            self.session.add(user_list)
+            await self.session.flush()  
             await self.session.commit()
+            return user_list.to_dict() if user_list else None
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+            print(f"Error adding user to list: {e}")
+            raise
+
+    async def remove_user_from_list(self, user_list_id: int):
+        """
+        Removes a UserList by its ID.
+        """
+        try:
+            user_list = await self.session.get(self.model, user_list_id)
+            if user_list:
+                await self.session.delete(user_list)
+                await self.session.commit()
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+            print(f"Error removing user from list: {e}")
+            raise
+
+    async def update_user_list(self, user_list_id: int, name: str = None, description: str = None) -> dict:
+        """
+        Updates the name and/or description of a UserList by its ID.
+        """
+        try:
+            user_list = await self.session.get(self.model, user_list_id)
+            if user_list:
+                if name is not None:
+                    user_list.name = name
+                if description is not None:
+                    user_list.description = description
+                await self.session.flush()
+                await self.session.commit()
+                return {"name": user_list.name, "description": user_list.description}
+            return {}
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+            print(f"Error updating user list: {e}")
+            raise
+
+    async def get_user_list_by_id(self, user_list_id: int) -> Optional[dict]:
+        """
+        Retrieves a UserList by its ID.
+        """
+        return await self.find_one_or_none_by_id(user_list_id, self.session)

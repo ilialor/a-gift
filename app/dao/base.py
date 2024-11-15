@@ -19,8 +19,12 @@ class BaseDAO(Generic[T]):
     @classmethod
     async def find_one_or_none_by_id(cls, data_id: int, session: AsyncSession):
         # Найти запись по ID
+        # Ensure `to_dict` is defined in Base and works correctly
         try:
-            return await session.get(cls.model, data_id)
+            stmt = select(cls.model).where(cls.model.id == data_id)
+            result = await session.execute(stmt)
+            record = result.scalars().first()
+            return record.to_dict() if record else None
         except SQLAlchemyError as e:
             print(f"Error occurred: {e}")
             raise
