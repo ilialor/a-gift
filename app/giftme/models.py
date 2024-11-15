@@ -1,8 +1,10 @@
 from typing import List
-from sqlalchemy import ARRAY, JSON, ForeignKey, Integer, String, Table, Text, text, Column, DateTime, BigInteger, PrimaryKeyConstraint
+from sqlalchemy import ARRAY, JSON, ForeignKey, Integer, String, Table, Enum, Text, text, Column, DateTime, BigInteger, PrimaryKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from app.dao.database import Base, uniq_str_an, array_or_none_an
+
+from enum import Enum as PyEnum
 
 class User(Base):
     username: Mapped[uniq_str_an]
@@ -26,6 +28,15 @@ class User(Base):
         'UserList',
         back_populates='owner',
         foreign_keys='UserList.user_id'  
+    )
+    own_calendars: Mapped[List['Calendar']] = relationship(
+        'Calendar',
+        back_populates='owner'
+    )
+    calendars: Mapped[List['Calendar']] = relationship(
+        'Calendar',
+        secondary='calendar_participants',
+        back_populates='participants'
     )
 
 class Profile(Base):
@@ -79,6 +90,12 @@ class Gift(Base):
         lazy='selectin'  # Set lazy loading strategy for async
     )
     payments: Mapped[List['Payment']] = relationship('Payment', back_populates='gift')
+    events: Mapped[List['Calendar']] = relationship(
+        'Calendar',
+        secondary='calendar_gift',
+        back_populates='gifts',
+        lazy='selectin'
+    )
     
     def to_dict(self) -> dict:
         return {
@@ -102,5 +119,114 @@ gift_list_gift = Table(
     'gift_list_gift',
     Base.metadata,
     Column('giftlist_id', ForeignKey('giftlists.id', ondelete='CASCADE'), primary_key=True),
+    Column('gift_id', ForeignKey('gifts.id', ondelete='CASCADE'), primary_key=True)
+)
+
+
+class EventTypeEnum(str, PyEnum):
+    BIRTHDAY = "birthday"
+    PERSONAL = "personal"  # личные праздники (годовщины и т.д.)
+    PROFESSIONAL = "professional"  # профессиональные праздники
+    NATIONAL = "national"  # государственные праздники
+    RELIGIOUS = "religious"  # религиозные праздники
+    CULTURAL = "cultural"  # культурные события
+    REMINDER = "reminder"  # напоминания о подарках
+    OTHER = "other"
+
+class RecurrenceTypeEnum(str, PyEnum):
+    NONE = "none"  # однократное событие
+    YEARLY = "yearly"  # ежегодное
+    MONTHLY = "monthly"  # ежемесячное
+    WEEKLY = "weekly"  # еженедельное
+    CUSTOM = "custom"  # пользовательская периодичность
+
+# Define the association table for Calendar and User
+calendar_participants = Table(
+    'calendar_participants',
+    Base.metadata,
+    Column('calendar_id', ForeignKey('calendar_events.id', ondelete='CASCADE'), primary_key=True),
+    Column('user_id', ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+)
+
+class Calendar(Base):
+    """
+    Модель календаря для отслеживания праздников и событий, связанных с подарками
+    """
+    __tablename__ = 'calendar_events'
+
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(255))
+    event_type: Mapped[EventTypeEnum] = mapped_column(Enum(EventTypeEnum), default=EventTypeEnum.BIRTHDAY, nullable=False)
+    
+    # Дата и время события
+    start_date: Mapped[datetime] = mapped_column(nullable=False)
+    end_date: Mapped[datetime | None]
+    
+    # Повторение события
+    recurrence_type: Mapped[RecurrenceTypeEnum] = mapped_column(
+        Enum(RecurrenceTypeEnum), 
+        nullable=False, 
+        default=RecurrenceTypeEnum.NONE
+    )
+    recurrence_rule: Mapped[dict | None] = mapped_column(
+        JSON,  # Для хранения сложных правил повторения
+        comment='JSON with recurrence rules (intervals, exclusions, etc.)'
+    )
+    
+    # Связь с пользователем
+    owner_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'))
+    owner: Mapped['User'] = relationship('User', back_populates='own_calendars')
+    
+    # Участники события (для групповых праздников)
+    participants: Mapped[List['User']] = relationship(
+        'User',
+        secondary='calendar_participants',
+        back_populates='calendars'
+    )
+    
+    # Теги для фильтрации и группировки
+    tags: Mapped[array_or_none_an]
+    
+    # Настройки напоминаний
+    reminder_days: Mapped[List[int] | None] = mapped_column(
+        ARRAY(Integer), 
+        comment='Days before event to send reminders'
+    )
+    
+    # Бюджет на подарки
+    budget: Mapped[float | None]
+    currency: Mapped[str | None] = mapped_column(String(3))  # ISO 4217 код валюты
+    
+    # Связанные подарки
+    gifts: Mapped[List['Gift']] = relationship(
+        'Gift',
+        secondary='calendar_gift',
+        back_populates='events',
+        lazy='selectin'
+    )
+    
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "event_type": self.event_type.value,
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat() if self.end_date else None,
+            "recurrence_type": self.recurrence_type.value,
+            "recurrence_rule": self.recurrence_rule,
+            "owner_id": self.owner_id,
+            "participant_ids": self.participants,
+            "tags": self.tags,
+            "reminder_days": self.reminder_days,
+            "budget": self.budget,
+            "currency": self.currency,
+        }
+
+# Таблица связи календаря и подарков
+calendar_gift = Table(
+    'calendar_gift',
+    Base.metadata,
+    Column('calendar_id', ForeignKey('calendar_events.id', ondelete='CASCADE'), primary_key=True),
     Column('gift_id', ForeignKey('gifts.id', ondelete='CASCADE'), primary_key=True)
 )

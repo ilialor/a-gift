@@ -5,7 +5,6 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from app.dao.database import Base, DATABASE_URL
-from models import User, Profile, GiftList, UserList, Gift, Payment
 
 config = context.config
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
@@ -15,6 +14,10 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+from app.giftme.models import (
+    User, Profile, GiftList, UserList, Gift, Payment,
+    EventTypeEnum, RecurrenceTypeEnum, Calendar, calendar_participants
+)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

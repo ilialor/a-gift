@@ -1,5 +1,6 @@
 from typing import Optional
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from app.dao.base import BaseDAO
@@ -98,6 +99,14 @@ class UserDAO(BaseDAO[User]):
         if user:
             await self.session.delete(user)
             await self.session.commit()
+
+    async def get_user_with_calendars(self, username: str) -> Optional[User]:
+        stmt = select(self.model).where(self.model.username == username).options(
+            selectinload(self.model.own_calendars),
+            selectinload(self.model.calendars)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
 
 
 class ProfileDAO(BaseDAO[Profile]):

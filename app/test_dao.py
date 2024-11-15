@@ -6,7 +6,8 @@ from sqlalchemy import select, text
 from app.dao.dao import UserDAO, GiftDAO, GiftListDAO, UserListDAO
 from app.dao.session_maker import async_session_maker
 from pydantic import BaseModel
-from app.giftme.models import Gift, Profile, UserList  
+from typing import List
+from app.giftme.models import Gift, Profile, User, UserList, Calendar  
 
 logging.basicConfig(level=logging.INFO)  
 
@@ -42,6 +43,12 @@ async def clear_users_dao():
         logging.info("Users cleared.")
         print("Users cleared.")
 
+async def clear_calendars_dao():
+    async with async_session_maker() as session:
+        async with session.begin():
+            await session.execute(text("DELETE FROM calendar_events"))
+        logging.info("Calendars cleared.")
+        print("Calendars cleared.")
 
 async def test_db_connection_dao():
     try:
@@ -251,6 +258,49 @@ async def test_get_user_list_by_id_dao(user_list_id: int):
         else:
             print("UserList not found.")
 
+### Add new test functions for Calendar
+
+async def create_test_calendar_dao(user_id: int, participant_ids: List[int]) -> int:
+    async with async_session_maker() as session:
+        calendar_data = {
+            "title": "Test Event",
+            "description": "This is a test calendar event.",
+            "event_type": "birthday",
+            "start_date": datetime.fromisoformat("2024-01-01T10:00:00"),
+            "owner_id": user_id,
+            "tags": ["test", "event"],
+            "reminder_days": [1, 7],
+            "budget": 100.0,
+            "currency": "USD"
+        }
+        calendar = Calendar(**calendar_data)
+        for pid in participant_ids:
+            user = await session.get(User, pid)
+            if user:
+                calendar.participants.append(user)
+        session.add(calendar)
+        await session.commit()
+        logging.info(f"Created Calendar - Title: {calendar.title}, Owner ID: {calendar.owner_id}")
+        print("Test calendar created.")
+        return calendar.id
+
+async def check_test_calendar_dao(calendar_id: int):
+    async with async_session_maker() as session:
+        calendar = await session.get(Calendar, calendar_id)
+        if calendar:
+            print(f"Retrieved Calendar - Title: {calendar.title}, Description: {calendar.description}")
+        else:
+            print("Test calendar does not exist.")
+
+async def delete_test_calendar_dao(calendar_id: int):
+    async with async_session_maker() as session:
+        calendar = await session.get(Calendar, calendar_id)
+        if calendar:
+            await session.delete(calendar)
+            await session.commit()
+            logging.info(f"Deleted Calendar - ID: {calendar_id}")
+            print("Test calendar deleted.")
+
 ### Integrate the new test functions into the main workflow
 
 async def main():
@@ -258,6 +308,7 @@ async def main():
     await clear_gift_lists_dao()
     await clear_gifts_dao()
     await clear_users_dao()
+    await clear_calendars_dao()
 
     await test_db_connection_dao()
     user_id = await create_test_user_dao()
@@ -279,6 +330,10 @@ async def main():
         await test_get_user_list_by_id_dao(user_list_id)
         await remove_test_user_list_dao(user_list_id)
     
+    calendar_id = await create_test_calendar_dao(user_id, [related_user_id])
+    await check_test_calendar_dao(calendar_id)
+    await delete_test_calendar_dao(calendar_id)
+
     await delete_test_gift_list_dao(gift_list_id)
     await delete_test_gift_dao(gift.id)
     await delete_test_user_dao(user_id)
