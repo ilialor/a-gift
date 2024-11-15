@@ -9,3 +9,4 @@ main.py
 pytest.ini
 .vscode/settings.json
 app/giftme/tests/test_dao.py
+app/test_dao.py
