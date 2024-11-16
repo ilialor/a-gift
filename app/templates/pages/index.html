@@ -1,59 +1,53 @@
-{% extends "base.html" %}
-
-{% block title %}GiftMe - Dashboard{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}GiftMe - Dashboard{% endblock %} {%
+block content %}
 <header class="header">
-    <div class="profile-section">
-        <div class="profile-pic"></div>
-        <div>Olga Agafonova</div>
-    </div>
-    <input type="search" class="search-bar" placeholder="Search...">
-    <button class="nav-button">⋮</button>
+  <div class="profile-section">
+    <div class="profile-pic"></div>
+    <div>Olga Aga</div>
+  </div>
+  <input type="search" class="search-bar" placeholder="Search..." />
+  <button class="nav-button">⋮</button>
 </header>
 
 <main>
-    <div class="feature-grid">
-        <a href="/twa/wishlist" class="feature-card">
-            <span class="feature-label">My Wishlist</span>
-        </a>
-        <a href="/twa/gifts" class="feature-card">
-            <span class="feature-label">Gift Ideas</span>
-        </a>
-    </div>
+  <div class="feature-grid">
+    <a href="/twa/wishlist" class="feature-card">
+      <span class="feature-label">My Wishlist</span>
+    </a>
+    <a href="/twa/gifts" class="feature-card">
+      <span class="feature-label">Gift Ideas</span>
+    </a>
+  </div>
 
-    <div class="feature-grid">
-        <a href="/twa/groups" class="feature-card">
-            <span class="feature-label">Groups</span>
-        </a>
-        <a href="/twa/contacts" class="feature-card">
-            <span class="feature-label">My Contacts</span>
-        </a>
-        <a href="/twa/publish" class="feature-card">
-            <span class="feature-label">To Publish</span>
-        </a>
-    </div>
+  <div class="feature-grid">
+    <a href="/twa/groups" class="feature-card">
+      <span class="feature-label">Groups</span>
+    </a>
+    <a href="/twa/contacts" class="feature-card">
+      <span class="feature-label">My Contacts</span>
+    </a>
+    <!-- <a href="/twa/publish" class="feature-card">
+      <span class="feature-label">To Publish</span>
+    </a> -->
+  </div>
 
-    <div id="calendar-root"></div>
+  <div id="calendar-root"></div>
 </main>
 
 <nav class="bottom-nav">
-    <button class="nav-button">≡</button>
-    <button class="nav-button">🎧</button>
-    <button class="nav-button">🔔</button>
-    <input type="text" class="message-input" placeholder="Message...">
-    <button class="nav-button">📤</button>
+  <button class="nav-button">≡</button>
+  <button class="nav-button">🎧</button>
+  <button class="nav-button">🔔</button>
+  <input type="text" class="message-input" placeholder="Message..." />
+  <button class="nav-button">📤</button>
 </nav>
-{% endblock %}
-
-{% block extra_scripts %}
-<script type="text/babel" src="/static/js/components/Calendar.jsx"></script>
-<script type="text/babel">
-    document.addEventListener('DOMContentLoaded', function() {
-        const calendarRoot = document.getElementById('calendar-root');
-        if (calendarRoot) {
-            ReactDOM.render(<Calendar />, calendarRoot);
-        }
-    });
+{% endblock %} {% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const calendarRoot = document.getElementById("calendar-root");
+    if (calendarRoot && window.Calendar) {
+      ReactDOM.render(React.createElement(window.Calendar), calendarRoot);
+    }
+  });
 </script>
 {% endblock %}
