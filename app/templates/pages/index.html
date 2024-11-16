@@ -1,182 +1,59 @@
-{% extends "base.html" %} {% block styles %} {{ super() }}
-<style>
-  .header {
-    padding: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
+{% extends "base.html" %}
 
-  .profile-pic {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background-color: #ffffff;
-  }
+{% block title %}GiftMe - Dashboard{% endblock %}
 
-  .search-bar {
-    flex: 1;
-    padding: 0.5rem;
-    border-radius: 1rem;
-    border: 1px solid var(--secondary-color);
-    background: transparent;
-    color: var(--text-color);
-  }
-
-  .menu-dots {
-    padding: 0.5rem;
-  }
-
-  .shortcut-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-    padding: 1rem;
-  }
-
-  .shortcut-card {
-    aspect-ratio: 16/9;
-    background: var(--secondary-color);
-    border-radius: 1rem;
-    backdrop-filter: blur(10px);
-  }
-
-  .icon-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    padding: 1rem;
-  }
-
-  .icon-card {
-    aspect-ratio: 1;
-    background: var(--secondary-color);
-    border-radius: 1rem;
-    backdrop-filter: blur(10px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .calendar {
-    margin: 1rem;
-    padding: 1rem;
-    background: var(--secondary-color);
-    border-radius: 1rem;
-    backdrop-filter: blur(10px);
-  }
-
-  .calendar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-  }
-
-  .calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 0.5rem;
-    text-align: center;
-  }
-
-  .day-header {
-    font-weight: bold;
-    color: var(--text-color);
-  }
-
-  .day {
-    padding: 0.5rem;
-  }
-
-  .weekend {
-    color: #ff0000;
-  }
-
-  .bottom-bar {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    padding: 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--primary-color);
-  }
-
-  .message-input {
-    flex: 1;
-    padding: 0.5rem;
-    margin-right: 1rem;
-    border-radius: 1rem;
-    border: 1px solid var(--secondary-color);
-    background: transparent;
-    color: var(--text-color);
-  }
-
-  .send-button {
-    padding: 0.5rem;
-    background: transparent;
-    border: none;
-    color: var(--text-color);
-  }
-</style>
-{% endblock %} {% block content %}
-<div class="header">
-  <div class="profile-pic"></div>
-  <div>Olga Agafonova</div>
-  <input type="search" class="search-bar" placeholder="Search..." />
-  <div class="menu-dots">⋮</div>
-</div>
-
-<div class="shortcut-grid">
-  <div class="shortcut-card"></div>
-  <div class="shortcut-card"></div>
-</div>
-
-<div class="icon-grid">
-  <div class="shortcut-card"></div>
-  <div class="shortcut-card">
-    <span>My contacts</span>
-  </div>
-  <div class="shortcut-card">
-    <span>To publish</span>
-  </div>
-</div>
-
-<div class="calendar">
-  <div class="calendar-header">
-    <span>December 2024</span>
-    <div>
-      <button>❮</button>
-      <button>❯</button>
+{% block content %}
+<header class="header">
+    <div class="profile-section">
+        <div class="profile-pic"></div>
+        <div>Olga Agafonova</div>
     </div>
-  </div>
-  <div class="calendar-grid">
-    <div class="day-header">Mon</div>
-    <div class="day-header">Tue</div>
-    <div class="day-header">Wed</div>
-    <div class="day-header">Thu</div>
-    <div class="day-header">Fri</div>
-    <div class="day-header weekend">Sat</div>
-    <div class="day-header weekend">Sun</div>
-    <!-- Calendar days would be dynamically generated -->
-  </div>
-</div>
+    <input type="search" class="search-bar" placeholder="Search...">
+    <button class="nav-button">⋮</button>
+</header>
 
-<div class="bottom-bar">
-  <button>≡</button>
-  <button>🎧</button>
-  <button>🔔</button>
-  <input type="text" class="message-input" placeholder="..." />
-  <button class="send-button">📤</button>
-</div>
-{% endblock %} {% block scripts %}
-<script>
-  // Calendar generation code would go here
-  function generateCalendar() {
-    // Implementation details
-  }
+<main>
+    <div class="feature-grid">
+        <a href="/twa/wishlist" class="feature-card">
+            <span class="feature-label">My Wishlist</span>
+        </a>
+        <a href="/twa/gifts" class="feature-card">
+            <span class="feature-label">Gift Ideas</span>
+        </a>
+    </div>
+
+    <div class="feature-grid">
+        <a href="/twa/groups" class="feature-card">
+            <span class="feature-label">Groups</span>
+        </a>
+        <a href="/twa/contacts" class="feature-card">
+            <span class="feature-label">My Contacts</span>
+        </a>
+        <a href="/twa/publish" class="feature-card">
+            <span class="feature-label">To Publish</span>
+        </a>
+    </div>
+
+    <div id="calendar-root"></div>
+</main>
+
+<nav class="bottom-nav">
+    <button class="nav-button">≡</button>
+    <button class="nav-button">🎧</button>
+    <button class="nav-button">🔔</button>
+    <input type="text" class="message-input" placeholder="Message...">
+    <button class="nav-button">📤</button>
+</nav>
+{% endblock %}
+
+{% block extra_scripts %}
+<script type="text/babel" src="/static/js/components/Calendar.jsx"></script>
+<script type="text/babel">
+    document.addEventListener('DOMContentLoaded', function() {
+        const calendarRoot = document.getElementById('calendar-root');
+        if (calendarRoot) {
+            ReactDOM.render(<Calendar />, calendarRoot);
+        }
+    });
 </script>
 {% endblock %}
