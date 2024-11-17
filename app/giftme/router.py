@@ -8,6 +8,8 @@ from app.dao.dao import UserDAO, GiftDAO, GiftListDAO, UserListDAO
 from app.dao.session_maker import async_session_maker
 from app.giftme.models import Gift, User, GiftList, UserList
 from app.giftme.schemas import GiftResponse, GiftUpdate
+import logging
+
 from app.giftme.schemas import (
     GiftCreate,
     GiftUpdate,
@@ -62,10 +64,31 @@ async def read_root(request: Request):
 # Gifts Endpoints
 
 @router.post("/gifts", response_model=GiftResponse, summary="Create a new gift")
-async def create_gift(gift: GiftCreate, session: AsyncSession = Depends(async_session_maker)):
+async def create_gift(
+    gift: GiftCreate, 
+    request: Request, 
+    session: AsyncSession = Depends(async_session_maker)
+):
+    # Log the request body
+    logging.info(f"Request body for /gifts: {gift.model_dump()}")
+    
+    current_user_id = await get_current_user(request)  # Retrieve the authenticated user's ID
+    if gift.owner_id != current_user_id:
+        logging.warning(f"User ID {current_user_id} attempted to create gift for User ID {gift.owner_id}")
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot create gift for another user.")
+    
     gift_dao = GiftDAO(session)
-    new_gift = await gift_dao.create_gift(gift.dict())
+    new_gift = await gift_dao.create_gift(gift.model_dump())
+    logging.info(f"Gift created with ID: {new_gift.id} for User ID: {current_user_id}")
     return new_gift
+
+async def get_current_user(request: Request):
+    # Implement your user retrieval logic here
+    # For example, you can get the user from a session or a token
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return user
 
 @router.get("/gifts/{gift_id}", response_model=GiftResponse, summary="Retrieve a gift by ID")
 async def get_gift(gift_id: int, session: AsyncSession = Depends(async_session_maker)):
