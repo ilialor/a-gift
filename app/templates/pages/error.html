@@ -1,15 +1,29 @@
 {% extends "base.html" %}
-
-{% block title %}Error - GiftMe{% endblock %}
-
+{% block title %}Error{% endblock %}
 {% block content %}
-<div class="min-h-screen flex items-center justify-center bg-gray-900">
-    <div class="max-w-md w-full bg-teal-900 bg-opacity-20 rounded-xl p-8 backdrop-blur-sm">
-        <div class="text-center">
-            <h1 class="text-2xl font-bold text-white mb-4">Access Error</h1>
-            <p class="text-white mb-6">{{ error_message }}</p>
-            <p class="text-teal-300">Please open GiftMe through the Telegram bot.</p>
-        </div>
-    </div>
-</div>
+<header class="header">
+  <div class="profile-section">
+    <a href="/" class="nav-button">←</a>
+    <div class="profile-pic"></div>
+    <div>Error</div>
+  </div>
+  <input type="search" class="search-bar" placeholder="Search..." disabled />
+  <button class="nav-button" disabled>⋮</button>
+</header>
+
+<main class="p-4">
+  <h1 class="text-2xl font-bold mb-4">Authentication Error</h1>
+  <div class="bg-red-600 text-white rounded-xl p-4">
+    <p>{{ error_message }}</p>
+    <a href="/twa/" class="mt-4 inline-block px-4 py-2 bg-teal-600 text-white rounded-md">Return to Dashboard</a>
+  </div>
+</main>
+
+<nav class="bottom-nav">
+  <button class="nav-button" disabled>≡</button>
+  <button class="nav-button" disabled>🎧</button>
+  <button class="nav-button" disabled>🔔</button>
+  <input type="text" class="message-input" placeholder="Message..." disabled />
+  <button class="nav-button" disabled>📤</button>
+</nav>
 {% endblock %}

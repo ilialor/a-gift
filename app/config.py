@@ -12,8 +12,9 @@ class Settings(BaseSettings):
     BOT_TOKEN: str
     ADMIN_IDS: List[int]
     BASE_SITE: str
-    secret_key: str  # Added secret_key
+    secret_key: str  
     session_secret_key: str  
+    algorithm: str
     
     # DATABASE_SQLITE = 'sqlite+aiosqlite:///data/db.sqlite3'
     model_config = SettingsConfigDict(

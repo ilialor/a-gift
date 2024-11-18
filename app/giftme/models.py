@@ -11,6 +11,7 @@ class User(Base):
     email: Mapped[Optional[uniq_str_an]] = mapped_column(unique=True, nullable=True)
     password: Mapped[Optional[uniq_str_an]] = mapped_column(unique=False, nullable=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    refresh_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     profile: Mapped['Profile'] = relationship(
         'Profile',
         back_populates='user',

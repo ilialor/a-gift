@@ -43,7 +43,35 @@ block content %}
 </nav>
 {% endblock %} {% block extra_scripts %}
 <script>
+  function navigateTo(path) {
+    // Get current URL parameters
+    const currentParams = new URLSearchParams(window.location.search);
+    const initData = currentParams.get("initData");
+    const startParam = currentParams.get("tgWebAppStartParam");
+
+    const newUrl = new URL(path, window.location.origin);
+    if (initData && initData !== "init_data_here") {  // Prevent adding placeholder
+      newUrl.searchParams.set("initData", initData);
+    }
+    if (startParam) {
+      newUrl.searchParams.set("tgWebAppStartParam", startParam);
+    }
+
+    // Navigate to new URL
+    window.location.href = newUrl.toString();
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
+    // Handle all navigation links
+    document.querySelectorAll("a").forEach((link) => {
+      if (link.href.includes("/twa/")) {
+        link.addEventListener("click", function (e) {
+          e.preventDefault();
+          navigateTo(this.getAttribute("href"));
+        });
+      }
+    });
+    // Render the Calendar component
     const calendarRoot = document.getElementById("calendar-root");
     if (calendarRoot && window.Calendar) {
       ReactDOM.render(React.createElement(window.Calendar), calendarRoot);

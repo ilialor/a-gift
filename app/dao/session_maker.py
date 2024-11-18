@@ -30,7 +30,7 @@ def connection(isolation_level: Optional[str] = None, commit: bool = True):
                         await session.commit()
                     return result
                 except Exception as e:
-                    logger.error(f"Error in {method.__name__}: {e}")  # Add logging
+                    logger.error(f"Error in {method.__name__}: {e}")  
                     await session.rollback()
                     raise
                 finally:

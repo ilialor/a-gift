@@ -1,11 +1,11 @@
 .env
 Yak2048/
+YakFastAPIAuth/
 __pycache__/
 versions/
 app/giftme/test_db_connection.py
 setup.py
 sqlalchemy_test_history_sample.py
-main.py
 pytest.ini
 .vscode/settings.json
 app/giftme/tests/test_dao.py

@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update as sa_update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
@@ -135,6 +135,19 @@ class UserDAO(BaseDAO[User]):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
+    @staticmethod
+    async def find_by_id(session: AsyncSession, user_id: int) -> Optional[User]:
+        result = await session.execute(select(User).where(User.id == user_id))
+        return result.scalars().first()
+    
+    @staticmethod
+    async def update_refresh_token(session: AsyncSession, user_id: int, new_refresh_token: str) -> None:
+        await session.execute(
+            sa_update(User)
+            .where(User.id == user_id)
+            .values(refresh_token=new_refresh_token)
+        )
+        await session.commit()
 
 class ProfileDAO(BaseDAO[Profile]):
     model = Profile
