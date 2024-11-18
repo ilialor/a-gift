@@ -1,15 +1,22 @@
 from typing import Optional
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update as sa_update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from app.dao.base import BaseDAO
 from app.giftme.models import Gift, GiftList, Payment, User, Profile, UserList
-from app.giftme.schemas import UserPydantic
+from app.giftme.schemas import UserFilterPydantic, UserPydantic
 
 
 class UserDAO(BaseDAO[User]):
     model = User
+
+    @staticmethod
+    async def find_one_or_none(session: AsyncSession, filters: UserFilterPydantic) -> Optional[User]:
+        result = await session.execute(select(User).filter_by(**filters.dict()))
+        user = result.scalars().first()
+        # logging.info(f"UserDAO.find_one_or_none found user: {user.to_dict() if user else 'None'}")
+        return user
 
     @classmethod
     async def update_username_age_by_id(cls, session: AsyncSession, data_id: int, username: str, age: int):
@@ -128,6 +135,19 @@ class UserDAO(BaseDAO[User]):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
+    @staticmethod
+    async def find_by_id(session: AsyncSession, user_id: int) -> Optional[User]:
+        result = await session.execute(select(User).where(User.id == user_id))
+        return result.scalars().first()
+    
+    @staticmethod
+    async def update_refresh_token(session: AsyncSession, user_id: int, new_refresh_token: str) -> None:
+        await session.execute(
+            sa_update(User)
+            .where(User.id == user_id)
+            .values(refresh_token=new_refresh_token)
+        )
+        await session.commit()
 
 class ProfileDAO(BaseDAO[Profile]):
     model = Profile

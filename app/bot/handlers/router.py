@@ -1,11 +1,15 @@
-import logging  # Add this import
+import logging  
 from aiogram import Router, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from app.dao.dao import UserDAO
-from app.bot.keyboards.kbs import main_keyboard, record_keyboard
+from app.bot.keyboards.kbs import main_keyboard, record_keyboard  # Удален импорт create_webapp_button
 from app.dao.session_maker import connection 
 from app.giftme.schemas import UserPydantic, ProfilePydantic, UserFilterPydantic
+from app.twa.auth import TWAAuthManager  
+from app.config import settings  
+
+auth_manager = TWAAuthManager(settings.secret_key)
 
 router = Router()
 
@@ -37,14 +41,32 @@ async def cmd_start(message: Message, session, **kwargs):
                 profile=profile
             )
             logging.info(f"Creating new user with values: {values.model_dump()}") 
-            await UserDAO.add(session=session, values=values)
+            user = await UserDAO.add(session=session, values=values)
+            
+            access_token = auth_manager.create_access_token(user.id)
+            refresh_token = auth_manager.create_refresh_token(user.id)
+            
+            await UserDAO.update_refresh_token(session, user.id, refresh_token)
 
-        await message.answer(welcome_text, reply_markup=main_keyboard())
+        else:
+            access_token = auth_manager.create_access_token(user_info.id)
+            refresh_token = auth_manager.create_refresh_token(user_info.id)
+            
+            await UserDAO.update_refresh_token(session, user_info.id, refresh_token)
+
+        logging.info(f"Access token: {access_token}")
+        logging.info(f"Refresh token: {refresh_token}")
+
+        webapp_url = f"{settings.BASE_SITE}?tgWebAppStartParam={access_token}&refresh_token={refresh_token}"
+        logging.info(f"WebApp URL: {webapp_url}")
+        
+        webapp_btn = main_keyboard(webapp_url)  
+        
+        await message.answer("Welcome!", reply_markup=webapp_btn)
 
     except Exception as e:
         logging.error(f"Error in cmd_start: {e}")  
         await message.answer("Error. Please try again later.")
-
 
 
 # @router.callback_query(F.data == 'show_my_record')
@@ -79,10 +101,10 @@ async def cmd_start(message: Message, session, **kwargs):
 #         )
 #     else:
 #         text = (
-#             f"📊 Ваш рекорд: {best_score} очков. Вы находитесь на {rank}-ом месте в общем рейтинге.\n\n"
+#             f"📊 Ваш рекорд: {best_score} очков. Вы находитесь на {rank}-ом месте в общем рейтинг��.\n\n"
 #             "С каждым разом вы становитесь лучше! Нажмите кнопку ниже, чтобы попробовать "
 #             "подняться выше и побить свой рекорд!"
 #         )
 
-    # Отправляем новое сообщение с текстом и клавиатурой
+    # Отправляем но��ое сообщение с текстом и клавиатурой
     # await call.message.answer(text, reply_markup=record_keyboard())

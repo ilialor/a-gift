@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}GiftMe - {{ page_title }}{% endblock %}
+
+{% block content %}
+<header class="header">
+    <div class="profile-section">
+        <a href="/" class="nav-button">←</a>
+        <div class="profile-pic"></div>
+        <div>Olga A</div>
+    </div>
+    <input type="search" class="search-bar" placeholder="Search...">
+    <button class="nav-button">⋮</button>
+</header>
+
+<main class="p-4">
+    <h1 class="text-2xl font-bold mb-4">{{ page_title }}</h1>
+    <div class="bg-teal-900 bg-opacity-20 rounded-xl p-4 backdrop-blur-sm">
+        <p>This is the {{ page_title }} page. Content coming soon!</p>
+    </div>
+</main>
+
+<nav class="bottom-nav">
+    <button class="nav-button">≡</button>
+    <button class="nav-button">🎧</button>
+    <button class="nav-button">🔔</button>
+    <input type="text" class="message-input" placeholder="Message...">
+    <button class="nav-button">📤</button>
+</nav>
+{% endblock %}
