@@ -1,81 +1,53 @@
-{% extends "base.html" %} {% block title %}GiftMe - Dashboard{% endblock %} {%
-block content %}
-<header class="header">
-  <div class="profile-section">
-    <div class="profile-pic"></div>
-    <div>Olga Aga</div>
-  </div>
-  <input type="search" class="search-bar" placeholder="Search..." />
-  <button class="nav-button">⋮</button>
-</header>
+{% extends "base.html" %}
+{% block title %}GiftMe - Dashboard{% endblock %}
+{% block content %}
+<div class="header">
+    <div class="profile-section">
+        <div class="profile-pic"></div>
+        <div>{{ user.username }}</div>
+    </div>
+    <div>⋮</div>
+</div>
 
-<main>
-  <div class="feature-grid">
-    <a href="/twa/wishlist" class="feature-card">
-      <span class="feature-label">My Wishlist</span>
-    </a>
-    <a href="/twa/gifts" class="feature-card">
-      <span class="feature-label">Gifts</span>
-    </a>
-  </div>
+<div role="main">
+    <div class="feature-grid">
+        <a href="/twa/wishlist" class="feature-card">
+            <span class="feature-label">My Wishlist</span>
+        </a>
+        <a href="/twa/gifts" class="feature-card">
+            <span class="feature-label">Gifts</span>
+        </a>
+    </div>
 
-  <div class="feature-grid">
-    <a href="/twa/groups" class="feature-card">
-      <span class="feature-label">Groups</span>
-    </a>
-    <a href="/twa/contacts" class="feature-card">
-      <span class="feature-label">My Contacts</span>
-    </a>
-    <!-- <a href="/twa/publish" class="feature-card">
-      <span class="feature-label">To Publish</span>
-    </a> -->
-  </div>
+    <div class="feature-grid">
+        <a href="/twa/groups" class="feature-card">
+            <span class="feature-label">Groups</span>
+        </a>
+        <a href="/twa/contacts" class="feature-card">
+            <span class="feature-label">My Contacts</span>
+        </a>
+    </div>
 
-  <div id="calendar-root"></div>
-</main>
+    <!-- Calendar container -->
+    <div id="calendar-root" class="calendar-container"></div>
+</div>
 
 <nav class="bottom-nav">
-  <button class="nav-button">≡</button>
-  <button class="nav-button">🎧</button>
-  <button class="nav-button">🔔</button>
-  <input type="text" class="message-input" placeholder="Message..." />
-  <button class="nav-button">📤</button>
+    <button class="nav-button">≡</button>
+    <button class="nav-button">🎧</button>
+    <button class="nav-button">🔔</button>
+    <button class="nav-button">📤</button>
 </nav>
-{% endblock %} {% block extra_scripts %}
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
-  function navigateTo(path) {
-    // Get current URL parameters
-    const currentParams = new URLSearchParams(window.location.search);
-    const initData = currentParams.get("initData");
-    const startParam = currentParams.get("tgWebAppStartParam");
-
-    const newUrl = new URL(path, window.location.origin);
-    if (initData && initData !== "init_data_here") {  // Prevent adding placeholder
-      newUrl.searchParams.set("initData", initData);
-    }
-    if (startParam) {
-      newUrl.searchParams.set("tgWebAppStartParam", startParam);
-    }
-
-    // Navigate to new URL
-    window.location.href = newUrl.toString();
-  }
-
-  document.addEventListener("DOMContentLoaded", function () {
-    // Handle all navigation links
-    document.querySelectorAll("a").forEach((link) => {
-      if (link.href.includes("/twa/")) {
-        link.addEventListener("click", function (e) {
-          e.preventDefault();
-          navigateTo(this.getAttribute("href"));
-        });
-      }
+    // Additional calendar-specific initialization if needed
+    document.addEventListener('DOMContentLoaded', () => {
+        const calendarRoot = document.getElementById('calendar-root');
+        if (calendarRoot && !calendarRoot.hasChildNodes()) {
+            ReactDOM.render(React.createElement(Calendar), calendarRoot);
+        }
     });
-    // Render the Calendar component
-    const calendarRoot = document.getElementById("calendar-root");
-    if (calendarRoot && window.Calendar) {
-      ReactDOM.render(React.createElement(window.Calendar), calendarRoot);
-    }
-  });
 </script>
 {% endblock %}

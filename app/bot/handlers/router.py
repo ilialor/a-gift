@@ -1,9 +1,9 @@
 import logging  
 from aiogram import Router, F
 from aiogram.filters import CommandStart
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, LoginUrl
 from app.dao.dao import UserDAO
-from app.bot.keyboards.kbs import main_keyboard, record_keyboard  # Удален импорт create_webapp_button
+from app.bot.keyboards.kbs import main_keyboard
 from app.dao.session_maker import connection 
 from app.giftme.schemas import UserPydantic, ProfilePydantic, UserFilterPydantic
 from app.twa.auth import TWAAuthManager  
@@ -13,7 +13,6 @@ from fastapi import Request
 auth_manager = TWAAuthManager(settings.secret_key)
 
 router = Router()
-
 
 @router.message(CommandStart())
 @connection()
@@ -55,22 +54,17 @@ async def cmd_start(message: Message, session, **kwargs):
             
             await UserDAO.update_refresh_token(session, user_info.id, refresh_token)
 
-        logging.info(f"Access token: {access_token}")
-        logging.info(f"Refresh token: {refresh_token}")
-
-        webapp_url = f"{settings.BASE_SITE}?tgWebAppStartParam={access_token}&refresh_token={refresh_token}"
-        logging.info(f"WebApp URL: {webapp_url}")
+        # Changed URL to point directly to index page with auth params
+        webapp_url = f"{settings.BASE_SITE}/twa/?startParam={access_token}&refresh_token={refresh_token}"
+        login_url = LoginUrl(
+            url=webapp_url,
+            request_write_access=True
+        )
+        login_btn = InlineKeyboardButton(text="Open Giftme", url=webapp_url)
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[[login_btn]])
         
-        webapp_btn = main_keyboard(webapp_url)  
-        
-        await message.answer("Welcome!", reply_markup=webapp_btn)
+        await message.answer(welcome_text, reply_markup=keyboard)
 
     except Exception as e:
-        logging.error(f"app/bot/handlers/router.py Error in cmd_start: {e}")
+        logging.error(f"Error in cmd_start: {e}")
         await message.answer("An error occurred during authentication. Please try again later.")
-
-# Remove other callback_query handlers related to logging if any
-# @router.callback_query(F.data == 'show_my_record')
-# @connection()
-# async def get_user_rating(call: CallbackQuery, session, **kwargs):
-#     ...

@@ -1,41 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}GiftMe{% endblock %}</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <link href="/static/css/main.css" rel="stylesheet">
-    {% block extra_styles %}{% endblock %}
-    
-    <!-- Telegram WebApp Script -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    
-    <!-- Auth Manager -->
-    <script src="/static/js/auth.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize Auth Manager
-            AuthManager.initTelegramWebApp();
-            AuthManager.saveParams();
-            
-            // Listen for custom navigation events
-            window.addEventListener('twaNavigate', (event) => {
-                console.log('Navigation occurred:', event.detail.url);
-            });
-        });
-    </script>
-</head>
-<body>
-    <div class="light-dots"></div>
-    <div class="content-wrapper">
-        {% block content %}{% endblock %}
-    </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}{% endblock %}</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/main.css') }}"
+    />
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js"></script>
-    <!-- Include the compiled Calendar.js -->
-    <script src="/static/js/components/Calendar.js"></script>
+    <script>
+      // Auth Manager
+      const AuthManager = {
+        saveParams() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const authData = {
+            startParam: urlParams.get("startParam"),
+            refresh_token: urlParams.get("refresh_token"),
+          };
+          if (authData.startParam && authData.refresh_token) {
+            localStorage.setItem("authData", JSON.stringify(authData));
+          }
+        },
+
+        getParams() {
+          const authData = localStorage.getItem("authData");
+          return authData ? JSON.parse(authData) : null;
+        },
+
+        addParamsToUrl(url) {
+          const authData = this.getParams();
+          if (!authData) return url;
+
+          const urlObj = new URL(url, window.location.origin);
+          urlObj.searchParams.set("startParam", authData.startParam);
+          urlObj.searchParams.set("refresh_token", authData.refresh_token);
+          return urlObj.toString();
+        },
+
+        handleLinks() {
+          document.querySelectorAll("a").forEach((link) => {
+            if (link.href.startsWith(window.location.origin + "/twa/")) {
+              link.href = this.addParamsToUrl(link.href);
+            }
+          });
+        },
+      };
+    </script>
+
+    <!-- Calendar Component Script -->
+    <script src="{{ url_for('static', path='/js/components/Calendar.js') }}"></script>
+  </head>
+  <body>
+    <div class="light-dots"></div>
+    <div class="content-wrapper">{% block content %}{% endblock %}</div>
     {% block extra_scripts %}{% endblock %}
-</body>
+
+    <script>
+      // Initialize both auth and calendar on page load
+      document.addEventListener("DOMContentLoaded", () => {
+        AuthManager.saveParams();
+        AuthManager.handleLinks();
+
+        // Initialize calendar if the container exists
+        const calendarRoot = document.getElementById("calendar-root");
+        if (calendarRoot) {
+          ReactDOM.render(React.createElement(Calendar), calendarRoot);
+        }
+      });
+    </script>
+  </body>
 </html>

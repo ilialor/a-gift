@@ -149,6 +149,9 @@ class UserDAO(BaseDAO[User]):
         )
         await session.commit()
 
+    async def get_user_by_id(self, user_id: int) -> Optional[User]:
+        return await self.session.get(User, user_id)
+
 class ProfileDAO(BaseDAO[Profile]):
     model = Profile
 

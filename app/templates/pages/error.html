@@ -1,29 +1,34 @@
 {% extends "base.html" %}
 {% block title %}Error{% endblock %}
 {% block content %}
-<header class="header">
-  <div class="profile-section">
-    <a href="/" class="nav-button">←</a>
-    <div class="profile-pic"></div>
-    <div>Error</div>
-  </div>
-  <input type="search" class="search-bar" placeholder="Search..." disabled />
-  <button class="nav-button" disabled>⋮</button>
-</header>
 
-<main class="p-4">
-  <h1 class="text-2xl font-bold mb-4">Authentication Error</h1>
-  <div class="bg-red-600 text-white rounded-xl p-4">
-    <p>{{ error_message }}</p>
-    <a href="/twa/" class="mt-4 inline-block px-4 py-2 bg-teal-600 text-white rounded-md">Return to Dashboard</a>
-  </div>
-</main>
+<div class="header">
+    <div class="profile-section">
+        <a href="/twa/" class="nav-button">←</a>
+        <div class="profile-pic"></div>
+        <div>Error</div>
+    </div>
+    <div>⋮</div>
+</div>
+
+<div class="p-4" role="main">
+    <h1 class="text-2xl font-bold mb-4">Authentication Error</h1>
+
+    <div class="bg-red-600 text-white rounded-xl p-4">
+        <p>{{ error_message }}</p>
+
+        <a href="/twa/" 
+           class="mt-4 inline-block px-4 py-2 bg-teal-600 text-white rounded-md">
+            Return to Dashboard
+        </a>
+    </div>
+</div>
 
 <nav class="bottom-nav">
-  <button class="nav-button" disabled>≡</button>
-  <button class="nav-button" disabled>🎧</button>
-  <button class="nav-button" disabled>🔔</button>
-  <input type="text" class="message-input" placeholder="Message..." disabled />
-  <button class="nav-button" disabled>📤</button>
+    <button class="nav-button">≡</button>
+    <button class="nav-button">🎧</button>
+    <button class="nav-button">🔔</button>
+    <button class="nav-button">📤</button>
 </nav>
+
 {% endblock %}

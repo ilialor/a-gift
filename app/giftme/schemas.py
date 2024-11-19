@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserFilterPydantic(BaseModel):
@@ -33,15 +33,13 @@ class UsernameIdPydantic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class GiftCreate(BaseModel):
-    name: str
-    description: str
-    price: float
+    name: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
+    price: float = Field(..., gt=0)
     owner_id: int
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
-
 
 class GiftUpdate(BaseModel):
     name: Optional[str] = None
@@ -49,7 +47,6 @@ class GiftUpdate(BaseModel):
     price: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
-
 
 class GiftResponse(BaseModel):
     id: int
@@ -59,7 +56,6 @@ class GiftResponse(BaseModel):
     owner_id: int
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
-
 
 class GiftListCreate(BaseModel):
     name: str

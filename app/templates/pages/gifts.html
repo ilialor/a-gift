@@ -1,106 +1,130 @@
-{% extends "base.html" %} {% block title %}GiftMe - {{ page_title }}{% endblock
-%} {% block content %}
-<header class="header">
-  <div class="profile-section">
-    <a href="/" class="nav-button">←</a>
-    <div class="profile-pic"></div>
-    <div>{{ user.username }}</div>
-  </div>
-  <input type="search" class="search-bar" placeholder="Search..." />
-  <button class="nav-button">⋮</button>
-</header>
+{% extends "base.html" %}
+{% block title %}GiftMe - {{ page_title }}{% endblock %}
+{% block content %}
 
-<main class="p-4">
-  <h1 class="text-2xl font-bold mb-4">{{ page_title }}</h1>
-  <div class="bg-teal-900 bg-opacity-20 rounded-xl p-4 backdrop-blur-sm">
-    <p>{{ page_title }} page.</p>
-  </div>
+<div class="header">
+    <div class="profile-section">
+        <a href="/twa/" class="nav-button">←</a>
+        <div class="profile-pic"></div>
+        <div>{{ user.username }}</div>
+    </div>
+    <div>⋮</div>
+</div>
 
-  <!-- Add Gift Creation Form -->
-  <div class="mt-6">
-    <h2 class="text-xl font-semibold mb-2">Create a New Gift</h2>
-    <form id="create-gift-form" class="space-y-4">
-      <div>
-        <label for="gift-name" class="block text-sm font-medium"
-          >Gift Name</label
-        >
-        <input
-          type="text"
-          id="gift-name"
-          name="name"
-          required
-          class="mt-1 block w-full border border-gray-300 rounded-md p-2"
-        />
-      </div>
-      <div>
-        <label for="gift-description" class="block text-sm font-medium"
-          >Description</label
-        >
-        <textarea
-          id="gift-description"
-          name="description"
-          required
-          class="mt-1 block w-full border border-gray-300 rounded-md p-2"
-        ></textarea>
-      </div>
-      <div>
-        <label for="gift-price" class="block text-sm font-medium">Price</label>
-        <input
-          type="number"
-          id="gift-price"
-          name="price"
-          step="0.01"
-          required
-          class="mt-1 block w-full border border-gray-300 rounded-md p-2"
-        />
-      </div>
-      <button type="submit" class="px-4 py-2 bg-teal-600 text-white rounded-md">
-        Add Gift
-      </button>
-    </form>
-  </div>
-</main>
+<div class="p-4" role="main">
+    <h1 class="text-2xl font-bold mb-4">{{ page_title }}</h1>
+
+    <div class="bg-teal-900 bg-opacity-20 rounded-xl p-4 backdrop-blur-sm">
+        <h2 class="text-xl font-semibold mb-2">Create a New Gift</h2>
+        <form id="giftForm" class="space-y-4">
+            <div class="space-y-2">
+                <label for="name" class="block">Gift Name</label>
+                <input type="text" id="name" name="name" required
+                    class="w-full p-2 rounded bg-white bg-opacity-10 border border-teal-500">
+            </div>
+
+            <div class="space-y-2">
+                <label for="description" class="block">Description</label>
+                <textarea id="description" name="description" required
+                    class="w-full p-2 rounded bg-white bg-opacity-10 border border-teal-500"></textarea>
+            </div>
+
+            <div class="space-y-2">
+                <label for="price" class="block">Price</label>
+                <input type="number" id="price" name="price" step="0.01" required
+                    class="w-full p-2 rounded bg-white bg-opacity-10 border border-teal-500">
+            </div>
+
+            <button type="submit" 
+                class="w-full py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700">
+                Add Gift
+            </button>
+        </form>
+    </div>
+
+    <div class="mt-8">
+        <h2 class="text-xl font-semibold mb-4">My Gifts</h2>
+        <div class="space-y-4">
+            {% for gift in gifts %}
+            <div class="bg-teal-900 bg-opacity-10 rounded-xl p-4">
+                <h3 class="text-lg font-bold">{{ gift.name }}</h3>
+                <p>{{ gift.description }}</p>
+                <p class="text-teal-300">Price: ${{ gift.price }}</p>
+                {% if gift.lists %}
+                <p class="text-sm mt-2">Part of giftlist(s): {{ gift.lists | join(", ") }}</p>
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="text-center text-gray-400">You have no gifts yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
 
 <nav class="bottom-nav">
-  <button class="nav-button">≡</button>
-  <button class="nav-button">🎧</button>
-  <button class="nav-button">🔔</button>
-  <input type="text" class="message-input" placeholder="Message..." />
-  <button class="nav-button">📤</button>
+    <button class="nav-button">≡</button>
+    <button class="nav-button">🎧</button>
+    <button class="nav-button">🔔</button>
+    <button class="nav-button">📤</button>
 </nav>
-{% endblock %} {% block extra_scripts %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
-  const currentUserId = { $user_id };
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.Telegram) {
+        window.Telegram.WebApp.ready();
+    }
+    
+    const currentUserId = {{ user.id }};
+    console.log('currentUserId:', currentUserId);
 
-  document
-    .getElementById("create-gift-form")
-    .addEventListener("submit", async function (event) {
-      event.preventDefault();
+    const form = document.getElementById('giftForm');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
 
-      const name = document.getElementById("gift-name").value;
-      const description = document.getElementById("gift-description").value;
-      const price = parseFloat(document.getElementById("gift-price").value);
+        const authData = AuthManager.getParams();
+        if (!authData) {
+            console.error('No auth data found');
+            return;
+        }
 
-      const response = await fetch("/gifts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name,
-          description,
-          price,
-          owner_id: currentUserId, // Use the current user's ID as owner_id
-        }),
-      });
+        const formData = new FormData(form);
+        const giftData = {
+            name: formData.get('name'),
+            description: formData.get('description'),
+            price: parseFloat(formData.get('price')),
+            owner_id: currentUserId
+        };
 
-      if (response.ok) {
-        alert("Gift added successfully!");
-        // Refresh the page without triggering the form submission again
-        window.location.reload();
-      } else {
-        alert("Failed to add gift.");
-      }
+        try {
+            const response = await fetch('/twa/api/gifts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Start-Param': authData.startParam,
+                    'X-Refresh-Token': authData.refresh_token
+                },
+                body: JSON.stringify(giftData)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                console.log('Gift created:', result);
+                const redirectUrl = AuthManager.addParamsToUrl(window.location.pathname);
+                window.location.href = redirectUrl;
+            } else {
+                const error = await response.json();
+                console.error('Error creating gift:', error);
+                alert('Error creating gift: ' + error.detail);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error creating gift');
+        }
     });
+});
 </script>
 {% endblock %}
