@@ -1,75 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', path='css/main.css') }}"
-    />
+    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-
-    <script>
-      // Auth Manager
-      const AuthManager = {
-        saveParams() {
-          const urlParams = new URLSearchParams(window.location.search);
-          const authData = {
-            startParam: urlParams.get("startParam"),
-            refresh_token: urlParams.get("refresh_token"),
-          };
-          if (authData.startParam && authData.refresh_token) {
-            localStorage.setItem("authData", JSON.stringify(authData));
-          }
-        },
-
-        getParams() {
-          const authData = localStorage.getItem("authData");
-          return authData ? JSON.parse(authData) : null;
-        },
-
-        addParamsToUrl(url) {
-          const authData = this.getParams();
-          if (!authData) return url;
-
-          const urlObj = new URL(url, window.location.origin);
-          urlObj.searchParams.set("startParam", authData.startParam);
-          urlObj.searchParams.set("refresh_token", authData.refresh_token);
-          return urlObj.toString();
-        },
-
-        handleLinks() {
-          document.querySelectorAll("a").forEach((link) => {
-            if (link.href.startsWith(window.location.origin + "/twa/")) {
-              link.href = this.addParamsToUrl(link.href);
-            }
-          });
-        },
-      };
-    </script>
-
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="{{ url_for('static', path='js/auth.js') }}"></script>
+    
     <!-- Calendar Component Script -->
-    <script src="{{ url_for('static', path='/js/components/Calendar.js') }}"></script>
-  </head>
-  <body>
+    <script src="{{ url_for('static', path='js/components/Calendar.js') }}"></script>
+</head>
+<body>
     <div class="light-dots"></div>
-    <div class="content-wrapper">{% block content %}{% endblock %}</div>
+    <div class="content-wrapper">
+        {% block content %}{% endblock %}
+    </div>
     {% block extra_scripts %}{% endblock %}
 
     <script>
-      // Initialize both auth and calendar on page load
-      document.addEventListener("DOMContentLoaded", () => {
-        AuthManager.saveParams();
-        AuthManager.handleLinks();
-
-        // Initialize calendar if the container exists
-        const calendarRoot = document.getElementById("calendar-root");
-        if (calendarRoot) {
-          ReactDOM.render(React.createElement(Calendar), calendarRoot);
-        }
-      });
+        // Initialize both auth and calendar on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize calendar if the container exists
+            const calendarRoot = document.getElementById('calendar-root');
+            if (calendarRoot) {
+                ReactDOM.render(React.createElement(Calendar), calendarRoot);
+            }
+        });
     </script>
-  </body>
+</body>
 </html>
