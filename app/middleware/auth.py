@@ -30,10 +30,15 @@ class TelegramWebAppMiddleware(BaseHTTPMiddleware):
                 request.query_params.get('refresh_token') or 
                 request.headers.get('X-Refresh-Token')
             )
+            init_data = (
+                request.query_params.get('initData') or 
+                request.headers.get('X-Init-Data')
+            )
 
             logging.info(f"Processing request to {request.url.path}")
             logging.info(f"Start param present: {bool(start_param)}")
             logging.info(f"Refresh token present: {bool(refresh_token)}")
+            logging.info(f"Init data present: {bool(init_data)}")
             logging.info(f"Method: {request.method}")
             logging.info(f"Headers: {dict(request.headers)}")
 
@@ -45,6 +50,16 @@ class TelegramWebAppMiddleware(BaseHTTPMiddleware):
                 return RedirectResponse(url="/twa/error?message=Missing+authentication+parameters")
 
             try:
+                # Validate Telegram data if present
+                if init_data:
+                    try:
+                        validated_data = self.telegram_validator.validate_init_data(init_data)
+                        request.state.telegram_data = validated_data
+                        logging.info(f"Validated Telegram data: {validated_data}")
+                    except Exception as e:
+                        logging.error(f"Telegram data validation failed: {e}")
+                        return RedirectResponse(url="/twa/error?message=Invalid+Telegram+data")
+
                 # Validate the token
                 user_id = self.auth_manager.validate_token(start_param)
 
@@ -74,7 +89,7 @@ class TelegramWebAppMiddleware(BaseHTTPMiddleware):
                 
                 # Add CORS headers for API requests
                 if request.url.path.startswith('/twa/api/'):
-                    response.headers['Access-Control-Allow-Headers'] = 'X-Start-Param, X-Refresh-Token'
+                    response.headers['Access-Control-Allow-Headers'] = 'X-Start-Param, X-Refresh-Token, X-Init-Data'
                     response.headers['Access-Control-Allow-Origin'] = '*'
                 
                 return response
