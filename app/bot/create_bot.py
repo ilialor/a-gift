@@ -13,7 +13,7 @@ async def start_bot():
     logging.info("Bot started")
     try:
         for admin_id in settings.ADMIN_IDS:
-            await bot.send_message(admin_id, f'Я запущен🥳.')
+            await bot.send_message(admin_id, f'Bot was started.')
     except:
         pass
 
@@ -22,6 +22,6 @@ async def stop_bot():
     logging.info("Bot stopped")
     try:
         for admin_id in settings.ADMIN_IDS:
-            await bot.send_message(admin_id, 'Бот остановлен. За что?😔')
+            await bot.send_message(admin_id, 'Bot was stopped.')
     except:
         pass

@@ -1,5 +1,6 @@
 import logging
 from fastapi import APIRouter, Request, HTTPException, Depends, Query, status
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from app.dao.dao import UserDAO
@@ -26,6 +27,7 @@ async def index(
     request: Request,
     init_data: str = Query(None),
     start_param: str = Query(None),
+    refresh_token: str = Query(None),
     session: AsyncSession = Depends(async_session_maker)
 ):
     """Main TWA page with validation"""
@@ -51,17 +53,19 @@ async def index(
                 raise HTTPException(status_code=401, detail="User mismatch")
                 
             request.state.user = user
-    
-    except HTTPException:
-        return templates.TemplateResponse(
-            "pages/error.html",
-            {
-                "request": request,
-                "error_message": "Invalid access. Please open through Telegram bot."
-            }
-        )
-    
-    return templates.TemplateResponse("pages/index.html", {"request": request})
+
+    except HTTPException as he:
+        logging.error(f"app/auth/router.py HTTPException: {he.detail}")
+        return RedirectResponse(url="/twa/error?message=" + he.detail.replace(" ", "+"), status_code=he.status_code)
+    except Exception as e:
+        logging.error(f"app/auth/router.py Unexpected error: {e}")
+        return RedirectResponse(url="/twa/error?message=Unexpected+error", status_code=500)
+
+    return templates.TemplateResponse("pages/index.html", {
+        "request": request,
+        "user_id": user.id,
+        "user": user
+    })
 
 @router.get("/wishlist")
 async def wishlist(request: Request):
@@ -143,6 +147,7 @@ async def refresh_tokens(token_request: STokenRefreshRequest, session: AsyncSess
     
     # Обновление refresh_token в базе данных
     await UserDAO.update_refresh_token(session, user.id, new_refresh_token)
+    logging.info(f"app\\auth\\router.py: Refresh tokens issued for user_id: {user.id}")
     
     return STokenRefreshResponse(
         access_token=new_access_token,

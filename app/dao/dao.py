@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy import select, func, update as sa_update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -176,6 +176,12 @@ class GiftDAO(BaseDAO[Gift]):
         if gift:
             await self.session.delete(gift)
             await self.session.commit()
+
+    async def get_gifts_by_user_id(self, user_id: int) -> List[Gift]:
+        stmt = select(self.model).where(self.model.owner_id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()  # Return a list of gifts
+        
 
 
 class GiftListDAO(BaseDAO[GiftList]):

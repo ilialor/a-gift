@@ -4,6 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from app.giftme.models import User, Profile, Gift, Payment, GiftList, UserList
+import logging
 
 
 class BaseDAO:
@@ -60,6 +61,15 @@ class GiftDAO(BaseDAO):
             return result.scalars().all()
         except SQLAlchemyError:
             raise
+
+    async def create_gift(self, gift_data: dict):
+        logging.info(f"app\giftme\dao.py: Creating gift with data: {gift_data}")  # Log gift data
+        gift = Gift(**gift_data)
+        self.session.add(gift)
+        await self.session.commit()
+        await self.session.refresh(gift)
+        logging.info(f"app\giftme\dao.py: Gift created with id: {gift.id}")  # Log gift ID
+        return gift
 
 
 class PaymentDAO(BaseDAO):

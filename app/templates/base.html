@@ -16,7 +16,8 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize Auth Manager
-            AuthManager.init();
+            AuthManager.initTelegramWebApp();
+            AuthManager.saveParams();
             
             // Listen for custom navigation events
             window.addEventListener('twaNavigate', (event) => {
@@ -36,17 +37,5 @@
     <!-- Include the compiled Calendar.js -->
     <script src="/static/js/components/Calendar.js"></script>
     {% block extra_scripts %}{% endblock %}
-    
-    <!-- Error handling for auth -->
-    <script>
-        window.onerror = function(msg, url, line) {
-            console.error('JavaScript error:', msg, 'at', url, ':', line);
-            // Only redirect on auth-related errors
-            if (msg.toLowerCase().includes('auth')) {
-                window.location.href = '/twa/error?message=Authentication+error';
-            }
-            return false;
-        };
-    </script>
 </body>
 </html>
