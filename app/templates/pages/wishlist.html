@@ -1,127 +1,223 @@
-{% extends "base.html" %} {% block title %}GiftMe - Wishlist{% endblock %} {%
-block content %}
+{% extends "base.html" %}
+{% block title %}GiftMe - Wishlist{% endblock %}
+{% block content %}
 
 <div class="header">
-  <div class="profile-section">
-    <a href="/twa/" class="nav-button">←</a>
-    <div class="profile-pic"></div>
-    <div>{% if user %}{{ user.username }}{% else %}Guest{% endif %}</div>
-  </div>
-  <div>⋮</div>
+    <div class="profile-section">
+        <a href="/twa/" class="nav-button">←</a>
+        <div class="profile-pic"></div>
+        <div>{% if user %}{{ user.username }}{% else %}Guest{% endif %}</div>
+    </div>
+    <div>⋮</div>
 </div>
 
 <div class="p-4" role="main">
-  <h1 class="text-2xl font-bold mb-4">Wishlist</h1>
+    <h1 class="text-2xl font-bold mb-4">Wishlist</h1>
 
-  {% if selected_gift %}
-  <div class="bg-teal-900 bg-opacity-20 rounded-xl p-4 backdrop-blur-sm mb-6">
-    <h2 class="text-xl font-semibold mb-2">Selected Gift</h2>
-    <div class="bg-teal-900 bg-opacity-10 rounded-xl p-4">
-      <h3 class="text-lg font-bold">{{ selected_gift.name }}</h3>
-      <p class="text-gray-300">{{ selected_gift.description }}</p>
-      <p class="text-teal-300 mt-2">Price: ${{ selected_gift.price }}</p>
+    {% if selected_gift %}
+    <div class="bg-teal-900 bg-opacity-20 rounded-xl p-4 backdrop-blur-sm mb-6">
+        <h2 class="text-xl font-semibold mb-2">Selected Gift</h2>
+        <div class="bg-teal-900 bg-opacity-10 rounded-xl p-4">
+            <h3 class="text-lg font-bold">{{ selected_gift.name }}</h3>
+            <p class="text-gray-300">{{ selected_gift.description }}</p>
+            <p class="text-teal-300 mt-2">Price: ${{ selected_gift.price }}</p>
+        </div>
     </div>
-  </div>
-  {% endif %}
+    {% endif %}
 
-  <div class="mt-8">
-    <h2 class="text-xl font-semibold mb-4">Gift Lists</h2>
-    <div class="space-y-4">
-      {% for list in gift_lists %}
-      <div class="bg-teal-900 bg-opacity-10 rounded-xl p-4">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-bold">{{ list.name }}</h3>
-          {% if selected_gift %}
-          <label class="inline-flex items-center">
-            <input
-              type="checkbox"
-              class="form-checkbox h-5 w-5 text-teal-600"
-              onchange="toggleGiftInList('{{ selected_gift.id }}', '{{ list.id }}', this.checked)"
-              {%
-              if
-              list.id
-              in
-              selected_gift_lists
-              %}checked{%
-              endif
-              %}
-            />
-            <span class="ml-2">Add here</span>
-          </label>
-          {% endif %}
+    <div class="mt-8">
+        <h2 class="text-xl font-semibold mb-4">Gift Lists</h2>
+        <div class="space-y-4">
+            {% for list in gift_lists %}
+            <div class="bg-teal-900 bg-opacity-10 rounded-xl p-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold">{{ list.name }}</h3>
+                    {% if selected_gift %}
+                    <label class="gift-toggle inline-flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" 
+                                   class="sr-only"
+                                   onchange="toggleGiftInList('{{ selected_gift.id }}', '{{ list.id }}', this.checked, this.parentElement)"
+                                   {% if list.id in selected_gift_lists %}checked{% endif %}>
+                            <div class="toggle-bg block h-8 w-14 rounded-full transition-colors duration-300 ease-in-out 
+                                      {% if list.id in selected_gift_lists %}bg-teal-600{% else %}bg-gray-600{% endif %}">
+                            </div>
+                            <div class="toggle-dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 ease-in-out
+                                      {% if list.id in selected_gift_lists %}translate-x-6{% endif %}">
+                            </div>
+                        </div>
+                        <span class="ml-3 text-sm">Add to list</span>
+                    </label>
+                    {% endif %}
+                </div>
+                {% if list.gifts %}
+                <div class="mt-2 text-sm text-gray-400">
+                    Gifts: {{ list.gifts|length }}
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="text-center text-gray-400">You have no gift lists yet.</p>
+            {% endfor %}
         </div>
-        {% if list.gifts %}
-        <div class="mt-2 text-sm text-gray-400">
-          Gifts: {{ list.gifts|length }}
-        </div>
-        {% endif %}
-      </div>
-      {% else %}
-      <p class="text-center text-gray-400">You have no gift lists yet.</p>
-      {% endfor %}
     </div>
-  </div>
+
+    <!-- Floating Add Button -->
+    <button onclick="openCreateListModal()" 
+            class="fixed bottom-20 right-4 w-14 h-14 bg-teal-500 rounded-full flex items-center justify-center text-white text-2xl shadow-lg hover:bg-teal-600 transition-colors">
+        +
+    </button>
+</div>
+
+<!-- Create List Modal -->
+<div id="createListModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+    <div class="bg-teal-900 bg-opacity-90 rounded-xl p-6 m-4 w-full max-w-md backdrop-blur-sm">
+        <h2 class="text-xl font-bold mb-4">Create New Gift List</h2>
+        <form id="createListForm" class="space-y-4">
+            <div>
+                <label for="listName" class="block text-sm font-medium mb-1">List Name</label>
+                <input type="text" id="listName" name="name" required
+                       class="w-full p-2 rounded bg-white bg-opacity-10 border border-teal-500 text-white">
+            </div>
+            <div class="flex justify-end space-x-2 mt-4">
+                <button type="button" onclick="closeCreateListModal()"
+                        class="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-700 transition-colors">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 rounded bg-teal-600 text-white hover:bg-teal-700 transition-colors">
+                    Create
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <nav class="bottom-nav">
-  <button class="nav-button">≡</button>
-  <button class="nav-button">🎧</button>
-  <button class="nav-button">🔔</button>
-  <button class="nav-button">📤</button>
+    <button class="nav-button">≡</button>
+    <button class="nav-button">🎧</button>
+    <button class="nav-button">🔔</button>
+    <button class="nav-button">📤</button>
 </nav>
 
-{% endblock %} {% block extra_scripts %}
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    window.toggleGiftInList = async function (giftId, listId, checked) {
-      try {
-        const response = await AuthManager.fetchWithAuth(
-          "/twa/api/giftlist/toggle",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              gift_id: giftId,
-              list_id: listId,
-              action: checked ? "add" : "remove",
-            }),
-          }
-        );
+{% endblock %}
 
-        if (response.ok) {
-          if (window.Telegram?.WebApp) {
-            window.Telegram.WebApp.HapticFeedback.notificationOccurred(
-              "success"
-            );
-            window.Telegram.WebApp.showPopup({
-              message: checked
-                ? "Gift added to list"
-                : "Gift removed from list",
-              buttons: [{ type: "ok" }],
-            });
-          }
-        } else {
-          const error = await response.json();
-          if (window.Telegram?.WebApp) {
-            window.Telegram.WebApp.HapticFeedback.notificationOccurred("error");
-            window.Telegram.WebApp.showPopup({
-              message: error.detail || "Failed to update gift list",
-              buttons: [{ type: "ok" }],
-            });
-          }
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const modal = document.getElementById('createListModal');
+    const createListForm = document.getElementById('createListForm');
+
+    window.openCreateListModal = function() {
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
         }
-      } catch (error) {
-        console.error("Error:", error);
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.HapticFeedback.notificationOccurred("error");
-          window.Telegram.WebApp.showAlert(
-            "Failed to update gift list. Please try again."
-          );
+    }
+
+    window.closeCreateListModal = function() {
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
         }
-      }
-    };
-  });
+    }
+
+    window.toggleGiftInList = async function(giftId, listId, isChecked, toggleContainer) {
+        const toggleBg = toggleContainer.querySelector('.toggle-bg');
+        const toggleDot = toggleContainer.querySelector('.toggle-dot');
+        
+        try {
+            const response = await AuthManager.fetchWithAuth('/twa/api/giftlist/toggle', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    gift_id: giftId,
+                    list_id: listId,
+                    action: isChecked ? 'add' : 'remove'
+                })
+            });
+
+            if (response.ok) {
+                // При успехе
+                if (isChecked) {
+                    toggleBg.classList.remove('bg-gray-600');
+                    toggleBg.classList.add('bg-teal-600');
+                    toggleDot.classList.add('translate-x-6');
+                } else {
+                    toggleBg.classList.remove('bg-teal-600');
+                    toggleBg.classList.add('bg-gray-600');
+                    toggleDot.classList.remove('translate-x-6');
+                }
+            } else {
+                // При ошибке возвращаем в исходное состояние
+                const checkbox = toggleContainer.querySelector('input[type="checkbox"]');
+                checkbox.checked = !isChecked;
+                toggleBg.classList.toggle('bg-teal-600', !isChecked);
+                toggleBg.classList.toggle('bg-gray-600', isChecked);
+                toggleDot.classList.toggle('translate-x-6', !isChecked);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            // При ошибке возвращаем в исходное состояние
+            const checkbox = toggleContainer.querySelector('input[type="checkbox"]');
+            checkbox.checked = !isChecked;
+            toggleBg.classList.toggle('bg-teal-600', !isChecked);
+            toggleBg.classList.toggle('bg-gray-600', isChecked);
+            toggleDot.classList.toggle('translate-x-6', !isChecked);
+        }
+    }
+
+    if (createListForm) {
+        createListForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await AuthManager.fetchWithAuth('/twa/api/giftlist/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: formData.get('name'),
+                        owner_id: {{ user.id }}
+                    })
+                });
+
+                if (response.ok) {
+                    const currentUrl = new URL(window.location.href);
+                    const giftId = currentUrl.searchParams.get('gift_id');
+                    const newUrl = AuthManager.addParamsToUrl(
+                        giftId ? `/twa/wishlist?gift_id=${giftId}` : '/twa/wishlist'
+                    );
+                    window.location.href = newUrl;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+    }
+
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeCreateListModal();
+            }
+        });
+    }
+
+    // Обновление UI в зависимости от наличия gift_id
+    const urlParams = new URLSearchParams(window.location.search);
+    const giftId = urlParams.get('gift_id');
+    
+    // Если нет gift_id, скрываем переключатели
+    if (!giftId) {
+        document.querySelectorAll('.gift-toggle').forEach(toggle => {
+            toggle.style.display = 'none';
+        });
+    }
+});
 </script>
 {% endblock %}

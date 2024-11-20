@@ -58,6 +58,13 @@ class GiftResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 class GiftListCreate(BaseModel):
+    name: str = Field(..., min_length=1)
+    owner_id: int
+
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+
+class GiftListResponse(BaseModel):
+    id: int
     name: str
     owner_id: int
 
@@ -69,15 +76,6 @@ class GiftListUpdate(BaseModel):
     owner_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
-
-
-class GiftListResponse(BaseModel):
-    id: int
-    name: str
-    owner_id: int
-
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
-
 
 class UserListCreate(BaseModel):
     user_id: int

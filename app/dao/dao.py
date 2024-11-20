@@ -198,8 +198,7 @@ class GiftDAO(BaseDAO[Gift]):
             return result.scalar_one_or_none()
         except SQLAlchemyError as e:
             logging.error(f"Error getting gift with lists: {e}")
-            raise 
-
+            raise
 
 class GiftListDAO(BaseDAO[GiftList]):
     model = GiftList

@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.config import settings
 from app.giftme.models import Gift, User
-from app.giftme.schemas import GiftCreate, GiftResponse
+from app.giftme.schemas import GiftCreate, GiftListCreate, GiftListResponse, GiftResponse
 
 router = APIRouter(prefix="/twa", tags=["twa"])
 templates = Jinja2Templates(directory="app/templates")
@@ -66,41 +66,74 @@ async def wishlist_page(
             
             if gift_id:
                 gift_dao = GiftDAO(session)
-                # Get the actual Gift model instance instead of dict
-                selected_gift = await session.get(Gift, gift_id)
+                selected_gift = await gift_dao.get_gift_with_lists(gift_id, session)
                 if selected_gift:
-                    # Get the list IDs that contain this gift
                     selected_gift_lists = [gift_list.id for gift_list in selected_gift.lists]
             
-            return templates.TemplateResponse("pages/wishlist.html", {
+            context = {
                 "request": request,
                 "user": user,
                 "gift_lists": gift_lists,
                 "selected_gift": selected_gift,
                 "selected_gift_lists": selected_gift_lists
-            })
+            }
+            
+            return templates.TemplateResponse("pages/wishlist.html", context)
+
     except Exception as e:
         logging.error(f"Error in wishlist page: {e}")
         return RedirectResponse(url="/twa/error?message=Failed+to+load+wishlist")
+    
+@router.post("/api/giftlist/create", response_model=GiftListResponse)
+async def create_gift_list(request: Request, gift_list: GiftListCreate):
+    try:
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        if gift_list.owner_id != user_id:
+            raise HTTPException(status_code=403, detail="Cannot create list for another user")
+
+        logging.info(f"Creating gift list: {gift_list.model_dump()}")
+
+        async with async_session_maker() as session:
+            gift_list_dao = GiftListDAO(session)
+            new_list = await gift_list_dao.create_gift_list(gift_list.model_dump())
+            
+            if not new_list:
+                raise HTTPException(status_code=500, detail="Failed to create gift list")
+                
+            return GiftListResponse(
+                id=new_list.id,
+                name=new_list.name,
+                owner_id=new_list.owner_id
+            )
+
+    except Exception as e:
+        logging.error(f"Error creating gift list: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class GiftListToggleRequest(BaseModel):
+    gift_id: int
+    list_id: int
+    action: str  # 'add' or 'remove'
 
 @router.post("/api/giftlist/toggle")
-async def toggle_gift_in_list(request: Request):
+async def toggle_gift_in_list(request: Request, toggle_data: GiftListToggleRequest):
     try:
-        data = await request.json()
-        gift_id = data.get("gift_id")
-        list_id = data.get("list_id")
-        action = data.get("action")
-        
-        if not all([gift_id, list_id, action]) or action not in ["add", "remove"]:
-            raise HTTPException(status_code=400, detail="Invalid request data")
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
 
         async with async_session_maker() as session:
             gift_list_dao = GiftListDAO(session)
             
-            if action == "add":
-                success = await gift_list_dao.add_gift_to_list(list_id, gift_id)
+            if toggle_data.action == "add":
+                success = await gift_list_dao.add_gift_to_list(toggle_data.list_id, toggle_data.gift_id)
+            elif toggle_data.action == "remove":
+                success = await gift_list_dao.remove_gift_from_list(toggle_data.list_id, toggle_data.gift_id)
             else:
-                success = await gift_list_dao.remove_gift_from_list(list_id, gift_id)
+                raise HTTPException(status_code=400, detail="Invalid action")
 
             if not success:
                 raise HTTPException(status_code=400, detail="Failed to update gift list")
