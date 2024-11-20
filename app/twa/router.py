@@ -5,14 +5,14 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 from pydantic import BaseModel, Field
-from app.dao.dao import GiftDAO, UserDAO
+from app.dao.dao import GiftDAO, GiftListDAO, UserDAO
 from app.twa.validation import TelegramWebAppValidator
 from app.twa.auth import TWAAuthManager
 from app.dao.session_maker import async_session_maker
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.config import settings
-from app.giftme.models import User
+from app.giftme.models import Gift, User
 from app.giftme.schemas import GiftCreate, GiftResponse
 
 router = APIRouter(prefix="/twa", tags=["twa"])
@@ -48,19 +48,68 @@ async def main_page(
         return RedirectResponse(url="/twa/error?message=Authentication+failed")
 
 @router.get("/wishlist")
-async def wishlist_page(request: Request):
-    user_id = request.state.user_id  # Get user_id from middleware
+async def wishlist_page(
+    request: Request,
+    gift_id: Optional[int] = None
+):
+    user = request.state.user
+    if not user:
+        return RedirectResponse(url="/twa/error?message=User+not+found")
 
-    async with async_session_maker() as session:
-        user = await UserDAO.find_by_id(session, user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+    try:
+        async with async_session_maker() as session:
+            gift_list_dao = GiftListDAO(session)
+            gift_lists = await gift_list_dao.get_giftlists_with_gifts(user.id)
+            
+            selected_gift = None
+            selected_gift_lists = []
+            
+            if gift_id:
+                gift_dao = GiftDAO(session)
+                # Get the actual Gift model instance instead of dict
+                selected_gift = await session.get(Gift, gift_id)
+                if selected_gift:
+                    # Get the list IDs that contain this gift
+                    selected_gift_lists = [gift_list.id for gift_list in selected_gift.lists]
+            
+            return templates.TemplateResponse("pages/wishlist.html", {
+                "request": request,
+                "user": user,
+                "gift_lists": gift_lists,
+                "selected_gift": selected_gift,
+                "selected_gift_lists": selected_gift_lists
+            })
+    except Exception as e:
+        logging.error(f"Error in wishlist page: {e}")
+        return RedirectResponse(url="/twa/error?message=Failed+to+load+wishlist")
 
-    return templates.TemplateResponse("pages/wishlist.html", {
-        "request": request,
-        "user_id": user_id,
-        "user": user  # Pass the user object to the template
-    })
+@router.post("/api/giftlist/toggle")
+async def toggle_gift_in_list(request: Request):
+    try:
+        data = await request.json()
+        gift_id = data.get("gift_id")
+        list_id = data.get("list_id")
+        action = data.get("action")
+        
+        if not all([gift_id, list_id, action]) or action not in ["add", "remove"]:
+            raise HTTPException(status_code=400, detail="Invalid request data")
+
+        async with async_session_maker() as session:
+            gift_list_dao = GiftListDAO(session)
+            
+            if action == "add":
+                success = await gift_list_dao.add_gift_to_list(list_id, gift_id)
+            else:
+                success = await gift_list_dao.remove_gift_from_list(list_id, gift_id)
+
+            if not success:
+                raise HTTPException(status_code=400, detail="Failed to update gift list")
+
+            return JSONResponse(status_code=200, content={"status": "success"})
+
+    except Exception as e:
+        logging.error(f"Error toggling gift in list: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/api/gifts", response_model=GiftResponse)
 async def create_gift(request: Request, gift_data: GiftCreate):
@@ -109,55 +158,6 @@ async def gifts_page(request: Request):
         "gifts": gifts,
         "page_title": "My Gifts"
     })
-
-# @router.get("/gifts")
-# async def gifts_page(request: Request):
-#     user_id = request.state.user_id  
-
-#     async with async_session_maker() as session:
-#         user = await UserDAO.find_by_id(session, user_id)
-#         if not user:
-#             raise HTTPException(status_code=404, detail="User not found")
-#         gifts_dao = GiftDAO(session)
-#         gifts = await gifts_dao.get_gifts_by_user_id(user_id)  # Fetch user's gifts
-
-#     return templates.TemplateResponse("pages/gifts.html", {
-#         "request": request,
-#         "user_id": user_id,
-#         "user": user,
-#         "gifts": gifts  # Pass gifts to the template
-#     })
-
-# # Enhance error handling and logging during gift creation
-
-# @router.post("/gifts", status_code=status.HTTP_201_CREATED)
-# async def create_gift(request: Request, gift: GiftCreate):
-#     try:
-#         user = request.state.user_id  # Ensure user is set by middleware
-#         if not user:
-#             raise HTTPException(status_code=401, detail="Unauthorized")
-
-#         # Create new gift associated with the user
-#         async with async_session_maker() as session:
-#             new_gift = await GiftDAO(session).create_gift(user_id=user, gift_data=gift)
-#             logging.info(f"app/twa/router.py: Gift created for user_id: {user}")
-        
-#             return {"message": "Gift added successfully!", "gift": new_gift}
-#     except HTTPException as he:
-#         logging.error(f"app/twa/router.py: HTTPException - {he.detail}")
-#         raise he
-#     except Exception as e:
-#         logging.error(f"app/twa/router.py: Error creating gift: {e}")  # Log exception with details
-#         raise HTTPException(status_code=500, detail="Internal Server Error")
-
-# async def get_current_user(request: Request) -> int:
-#     user_id = request.state.user_id
-#     if not user_id:
-#         user_id = request.session.get("user_id")
-#     if not user_id:
-#         logging.warning(f"Unauthorized access to gifts page. user_id: {user_id}")
-#         raise HTTPException(status_code=401, detail="Unauthorized")
-#     return user_id
 
 @router.get("/groups")
 async def groups(request: Request):

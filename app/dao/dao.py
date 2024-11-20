@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, List
 from sqlalchemy import select, func, update as sa_update
 from sqlalchemy.orm import selectinload
@@ -183,8 +184,21 @@ class GiftDAO(BaseDAO[Gift]):
     async def get_gifts_by_user_id(self, user_id: int) -> List[Gift]:
         stmt = select(self.model).where(self.model.owner_id == user_id)
         result = await self.session.execute(stmt)
-        return result.scalars().all()  # Return a list of gifts
-        
+        return result.scalars().all()  # Return a list of gifts       
+
+    async def get_gift_with_lists(self, gift_id: int, session: AsyncSession):
+        """Get a gift with its associated lists"""
+        try:
+            query = (
+                select(self.model)
+                .options(selectinload(self.model.lists))
+                .where(self.model.id == gift_id)
+            )
+            result = await session.execute(query)
+            return result.scalar_one_or_none()
+        except SQLAlchemyError as e:
+            logging.error(f"Error getting gift with lists: {e}")
+            raise 
 
 
 class GiftListDAO(BaseDAO[GiftList]):
@@ -201,6 +215,58 @@ class GiftListDAO(BaseDAO[GiftList]):
         if gift_list:
             await self.session.delete(gift_list)
             await self.session.commit()
+
+    async def add_gift_to_list(self, list_id: int, gift_id: int) -> bool:
+        """Add a gift to a gift list"""
+        try:
+            gift_list = await self.session.get(self.model, list_id)
+            gift = await self.session.get(Gift, gift_id)
+            
+            if not gift_list or not gift:
+                return False
+                
+            if gift not in gift_list.gifts:
+                gift_list.gifts.append(gift)
+                await self.session.commit()
+            return True
+        except Exception as e:
+            logging.error(f"Error adding gift to list: {e}")
+            await self.session.rollback()
+            return False
+
+    async def remove_gift_from_list(self, list_id: int, gift_id: int) -> bool:
+        """Remove a gift from a gift list"""
+        try:
+            gift_list = await self.session.get(self.model, list_id)
+            gift = await self.session.get(Gift, gift_id)
+            
+            if not gift_list or not gift:
+                return False
+                
+            if gift in gift_list.gifts:
+                gift_list.gifts.remove(gift)
+                await self.session.commit()
+            return True
+        except Exception as e:
+            logging.error(f"Error removing gift from list: {e}")
+            await self.session.rollback()
+            return False
+        
+    async def get_giftlists_with_gifts(self, owner_id: int):
+        """Get all gift lists with their associated gifts for a specific owner"""
+        try:
+            query = (
+                select(self.model)
+                .options(
+                    selectinload(self.model.gifts)
+                )
+                .where(self.model.owner_id == owner_id)
+            )
+            result = await self.session.execute(query)
+            return result.scalars().all()
+        except SQLAlchemyError as e:
+            logging.error(f"Error getting gift lists with gifts: {e}")
+            raise
 
 
 class UserListDAO(BaseDAO[UserList]):
