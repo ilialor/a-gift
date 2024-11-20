@@ -20,3 +20,4 @@ app/templates/pages/records.html
 app/static/meta/*
 app/static/main_page1.png
 app/static/.jshintrc
+app/static/js/GroupList.js

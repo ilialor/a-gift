@@ -66,9 +66,9 @@ class UserList(Base):
 
     name: Mapped[str] = mapped_column(String(), nullable=False)
     description: Mapped[str | None] = mapped_column(String(), nullable=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'))
-    gift_list_id: Mapped[int] = mapped_column(ForeignKey('giftlists.id', ondelete='CASCADE'))
-    added_user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'))
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    gift_list_id: Mapped[int | None] = mapped_column(ForeignKey('giftlists.id', ondelete='CASCADE'), nullable=True)
+    added_user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
 
     added_user = relationship('User', foreign_keys=[added_user_id])
     gift_list = relationship('GiftList', back_populates='groups')

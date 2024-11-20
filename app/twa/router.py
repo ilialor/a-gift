@@ -5,12 +5,12 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 from pydantic import BaseModel, Field
-from app.dao.dao import GiftDAO, GiftListDAO, UserDAO
+from app.dao.dao import GiftDAO, GiftListDAO, UserDAO, UserListDAO
 from app.twa.validation import TelegramWebAppValidator
 from app.twa.auth import TWAAuthManager
 from app.dao.session_maker import async_session_maker
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
+from typing import List, Optional
 from app.config import settings
 from app.giftme.models import Gift, User
 from app.giftme.schemas import GiftCreate, GiftListCreate, GiftListResponse, GiftResponse
@@ -20,6 +20,72 @@ templates = Jinja2Templates(directory="app/templates")
 
 telegram_validator = TelegramWebAppValidator(settings.BOT_TOKEN)
 auth_manager = TWAAuthManager(settings.secret_key)
+
+@router.get("/groups")
+async def groups_page(request: Request):
+    """Groups page"""
+    user = request.state.user
+    if not user:
+        return RedirectResponse(url="/twa/error?message=User+not+found")
+
+    try:
+        async with async_session_maker() as session:
+            user_list_dao = UserListDAO(session)
+            user_lists = await user_list_dao.get_user_lists(user.id)
+            
+            return templates.TemplateResponse("pages/groups.html", {
+                "request": request,
+                "user": user,
+                "user_lists": user_lists,
+                "page_title": "Groups"
+            })
+            
+    except Exception as e:
+        logging.error(f"Error loading groups page: {e}")
+        return RedirectResponse(url="/twa/error?message=Failed+to+load+groups")
+
+@router.post("/api/groups")
+async def create_user_list(request: Request, data: dict):
+    try:
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        async with async_session_maker() as session:
+            user_list_dao = UserListDAO(session)
+
+            user_list_data = {
+                "name": data["name"],
+                "user_id": user_id
+            }
+
+            user_list = await user_list_dao.create_user_list(user_list_data)            
+
+            return JSONResponse(status_code=200, content={"id": user_list.id})
+
+    except Exception as e:
+        logging.error(f"Error creating group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.patch("/api/groups/{list_id}/toggle")
+async def toggle_group_status(request: Request, list_id: int, data: dict):
+    try:
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        async with async_session_maker() as session:
+            user_list_dao = UserListDAO(session)
+            success = await user_list_dao.toggle_member(list_id, data["is_active"])
+            
+            if not success:
+                raise HTTPException(status_code=400, detail="Failed to update status")
+
+            return JSONResponse(status_code=200, content={"status": "success"})
+
+    except Exception as e:
+        logging.error(f"Error toggling group status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/")
 async def main_page(

@@ -271,6 +271,25 @@ class GiftListDAO(BaseDAO[GiftList]):
 class UserListDAO(BaseDAO[UserList]):
     model = UserList
 
+    async def create_user_list(self, user_list_data: dict) -> UserList:
+        """Create a new user list with just name and user_id"""
+        try:
+            user_list = self.model(
+                name=user_list_data["name"],
+                user_id=user_list_data["user_id"]
+                # description=user_list_data.get("description"),  # Optional
+                # gift_list_id=user_list_data.get("gift_list_id"),  # Optional
+                # added_user_id=user_list_data.get("added_user_id")  # Optional
+            )
+            self.session.add(user_list)
+            await self.session.commit()
+            await self.session.refresh(user_list)
+            return user_list
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+            logging.error(f"Error creating user list: {e}")
+            raise
+    
     async def add_user_to_list(self, user_list_data: dict) -> Optional[dict]:
         """
         Adds a user to a user list with name and description using ORM.
@@ -337,3 +356,33 @@ class UserListDAO(BaseDAO[UserList]):
         Retrieves a UserList by its ID.
         """
         return await self.find_one_or_none_by_id(user_list_id, self.session)
+
+    async def get_user_lists(self, user_id: int) -> List[UserList]:
+        """Get all user lists where user is owner"""
+        try:
+            query = (
+                select(self.model)
+                .where(self.model.user_id == user_id)
+                .options(
+                    selectinload(self.model.added_user),
+                )
+            )
+            result = await self.session.execute(query)
+            return result.scalars().all()
+        except SQLAlchemyError as e:
+            logging.error(f"Error getting user lists: {e}")
+            raise
+
+    async def toggle_member(self, list_id: int, is_active: bool) -> bool:
+        """Toggle member status in the list"""
+        try:
+            user_list = await self.session.get(self.model, list_id)
+            if user_list:
+                user_list.description = 'active' if is_active else 'inactive'
+                await self.session.commit()
+                return True
+            return False
+        except SQLAlchemyError as e:
+            logging.error(f"Error toggling member status: {e}")
+            await self.session.rollback()
+            return False

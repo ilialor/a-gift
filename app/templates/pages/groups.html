@@ -1,30 +1,136 @@
 {% extends "base.html" %}
-
-{% block title %}GiftMe - {{ page_title }}{% endblock %}
-
+{% block title %}GiftMe - Groups{% endblock %}
 {% block content %}
-<header class="header">
-    <div class="profile-section">
-        <a href="/" class="nav-button">←</a>
-        <div class="profile-pic"></div>
-        <div>Olga A</div>
-    </div>
-    <input type="search" class="search-bar" placeholder="Search...">
-    <button class="nav-button">⋮</button>
-</header>
 
-<main class="p-4">
-    <h1 class="text-2xl font-bold mb-4">{{ page_title }}</h1>
-    <div class="bg-teal-900 bg-opacity-20 rounded-xl p-4 backdrop-blur-sm">
-        <p>This is the {{ page_title }} page. Content coming soon!</p>
+<div class="header">
+    <div class="profile-section">
+        <a href="/twa/" class="nav-button">←</a>
+        <div class="profile-pic"></div>
+        <div>{% if user %}{{ user.username }}{% else %}Guest{% endif %}</div>
     </div>
-</main>
+    <div>⋮</div>
+</div>
+
+<div class="p-4 space-y-4">
+    <!-- Form for adding new list -->
+    <div class="bg-teal-900 bg-opacity-20 rounded-xl p-4">
+        <form id="addListForm" class="flex space-x-2">
+            <input type="text" 
+                   name="name" 
+                   placeholder="Enter list name" 
+                   required
+                   class="flex-1 p-2 rounded bg-white bg-opacity-10 border border-teal-500 text-white">
+            <button type="submit" 
+                    class="bg-teal-600 text-white px-4 py-2 rounded-lg">
+                Add List
+            </button>
+        </form>
+    </div>
+
+    <!-- User Lists -->
+    <div class="space-y-4">
+        {% for list in user_lists %}
+        <div class="bg-teal-900 bg-opacity-20 rounded-xl overflow-hidden">
+            <!-- List Header -->
+            <button onclick="toggleList('{{ list.id }}')" class="w-full p-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <span class="list-arrow">▶</span>
+                    <span class="font-semibold">{{ list.name }}</span>
+                    <span class="text-sm text-gray-400">
+                        {{ list.added_user.username }}
+                    </span>
+                </div>
+            </button>
+
+            <!-- List Details -->
+            <div id="list-{{ list.id }}-content" class="hidden border-t border-teal-800 p-4">
+                <div class="flex items-center justify-between">
+                    <span>{{ list.description or 'No description' }}</span>
+                    <!-- Toggle Switch -->
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" 
+                               {% if list.description == 'active' %}checked{% endif %}
+                               onchange="toggleMember('{{ list.id }}', this.checked)"
+                               class="sr-only peer">
+                        <div class="w-14 h-8 bg-gray-600 peer-focus:outline-none rounded-full peer-checked:after:translate-x-6 peer-checked:bg-teal-600 after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all"></div>
+                    </label>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center text-gray-400">No user lists yet</div>
+        {% endfor %}
+    </div>
+</div>
 
 <nav class="bottom-nav">
     <button class="nav-button">≡</button>
     <button class="nav-button">🎧</button>
     <button class="nav-button">🔔</button>
-    <input type="text" class="message-input" placeholder="Message...">
     <button class="nav-button">📤</button>
 </nav>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const addListForm = document.getElementById('addListForm');
+    addListForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(addListForm);
+        
+        try {
+            const response = await AuthManager.fetchWithAuth('/twa/api/groups', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: formData.get('name'),
+                    user_id: {{ user.id }}
+                })
+            });
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                const error = await response.json();
+                alert(error.detail || 'Failed to create list');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to create list');
+        }
+    });
+
+    window.toggleList = function(listId) {
+        const content = document.getElementById(`list-${listId}-content`);
+        const arrow = content.previousElementSibling.querySelector('.list-arrow');
+        const isHidden = content.classList.contains('hidden');
+        
+        content.classList.toggle('hidden');
+        arrow.textContent = isHidden ? '▼' : '▶';
+    };
+
+    window.toggleMember = async function(listId, isActive) {
+        try {
+            const response = await AuthManager.fetchWithAuth(`/twa/api/groups/${listId}/toggle`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ is_active: isActive })
+            });
+
+            if (!response.ok) {
+                checkbox.checked = !checkbox.checked;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            checkbox.checked = !checkbox.checked;
+        }
+    };
+});
+</script>
 {% endblock %}
