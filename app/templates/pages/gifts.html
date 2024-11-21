@@ -47,19 +47,35 @@
         <div class="space-y-4">
             {% for gift in gifts %}
             <div class="bg-teal-900 bg-opacity-10 rounded-xl p-4">
-                <h3 class="text-lg font-bold">{{ gift.name }}</h3>
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="text-lg font-bold">{{ gift.name }}</h3>
+                    <div class="flex space-x-2">
+                        <button onclick="shareGift('{{ gift.id }}', '{{ gift.name }}')" 
+                                class="bg-teal-600 text-white px-3 py-1 rounded-lg flex items-center text-sm hover:bg-teal-700">
+                            <span class="mr-1">🔗</span>Share
+                        </button>
+                        <button onclick="addToWishlist('{{ gift.id }}')"
+                                class="bg-teal-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-teal-700">
+                            + List
+                        </button>
+                    </div>
+                </div>
                 <p class="text-gray-300">{{ gift.description }}</p>
                 <p class="text-teal-300 mt-2">Price: ${{ gift.price }}</p>
                 {% if gift.lists %}
-                <p class="text-sm mt-2 text-gray-400">Part of giftlist(s): {{ gift.lists | join(", ") }}</p>
-                {% endif %}
-                <div class="mt-4">
-                    <button type="button" 
-                        class="py-2 px-4 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors"
-                        onclick="handleAddToWishlist('{{ gift.id }}')">
-                        Add to List
-                    </button>
+                <div class="mt-4 space-y-2">
+                    <p class="text-sm text-gray-400">In lists:</p>
+                    {% for list in gift.lists %}
+                    <div class="flex justify-between items-center bg-teal-900 bg-opacity-30 p-2 rounded-lg">
+                        <span>{{ list.name }}</span>
+                        <button onclick="shareList('{{ list.id }}', '{{ list.name }}')"
+                                class="bg-teal-600 text-white px-2 py-1 rounded text-sm hover:bg-teal-700 flex items-center">
+                            <span class="mr-1">🔗</span>Share
+                        </button>
+                    </div>
+                    {% endfor %}
                 </div>
+                {% endif %}
             </div>
             {% else %}
             <p class="text-center text-gray-400">You have no gifts yet.</p>
@@ -78,11 +94,54 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://telegram.org/js/telegram-widget.js?22"></script>
 <script>
-// Ensure all JavaScript code is wrapped in the DOMContentLoaded event
 document.addEventListener('DOMContentLoaded', () => {
     const currentUserId = {{ user.id }};
     console.log('currentUserId:', currentUserId);
+
+    function createGiftElement(gift) {
+        const giftDiv = document.createElement('div');
+        giftDiv.className = 'bg-teal-900 bg-opacity-10 rounded-xl p-4';
+        giftDiv.innerHTML = `
+            <div class="flex justify-between items-start mb-2">
+                <h3 class="text-lg font-bold">${gift.name}</h3>
+                <div class="flex space-x-2">
+                    <button onclick="shareGift('${gift.id}', '${gift.name}')" 
+                            class="bg-teal-600 text-white px-3 py-1 rounded-lg flex items-center text-sm hover:bg-teal-700">
+                        <span class="mr-1">🔗</span>Share
+                    </button>
+                    <button onclick="handleAddToWishlist('${gift.id}')"
+                            class="bg-teal-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-teal-700">
+                        + List
+                    </button>
+                </div>
+            </div>
+            <p class="text-gray-300">${gift.description}</p>
+            <p class="text-teal-300 mt-2">Price: $${gift.price}</p>
+        `;
+        return giftDiv;
+    }
+
+    window.shareGift = function(giftId, giftName) {
+        const shareUrl = `${window.location.origin}/gifts/${giftId}`;
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.switchInlineQuery(
+                `Check out this gift: ${giftName}!\n${shareUrl}`,
+                ['users', 'groups']
+            );
+        }
+    };
+
+    window.shareList = function(listId, listName) {
+        const shareUrl = `${window.location.origin}/lists/${listId}`;
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.switchInlineQuery(
+                `Check out my gift list: ${listName}!\n${shareUrl}`,
+                ['users', 'groups']
+            );
+        }
+    };
 
     // Define the gift form handler
     const form = document.getElementById('giftForm');
@@ -107,16 +166,23 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (response.ok) {
-                const result = await response.json();
-                console.log('Gift created:', result);
+                const gift = await response.json();
+                console.log('Gift created:', gift);
+                
+                // Находим контейнер для списка подарков внутри секции "My Gifts"
+                const giftsContainer = document.querySelector('.mt-8 .space-y-4');
+                const emptyMessage = giftsContainer.querySelector('p.text-center');
+                if (emptyMessage) {
+                    emptyMessage.remove();
+                }
+                giftsContainer.insertBefore(createGiftElement(gift), giftsContainer.firstChild);
+                
+                // Очищаем форму
+                form.reset();
                 
                 if (window.Telegram?.WebApp) {
                     window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                    window.Telegram.WebApp.showAlert('Gift was successfully created!', () => {
-                        window.location.href = AuthManager.addParamsToUrl(window.location.pathname);
-                    });
-                } else {
-                    window.location.href = AuthManager.addParamsToUrl(window.location.pathname);
+                    window.Telegram.WebApp.showAlert('Gift was successfully created!');
                 }
             } else {
                 const error = await response.json();
@@ -149,4 +215,4 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 });
 </script>
-{% endblock %}
+{% endblock %} 

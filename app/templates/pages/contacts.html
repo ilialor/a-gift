@@ -1,30 +1,134 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block title %}GiftMe - Contacts{% endblock %} {%
+block content %}
 
-{% block title %}GiftMe - {{ page_title }}{% endblock %}
+<div class="header">
+  <div class="profile-section">
+    <a href="/twa/" class="nav-button">←</a>
+    <div class="profile-pic"></div>
+    <div>{% if user %}{{ user.username }}{% else %}Guest{% endif %}</div>
+  </div>
+</div>
 
-{% block content %}
-<header class="header">
-    <div class="profile-section">
-        <a href="/" class="nav-button">←</a>
-        <div class="profile-pic"></div>
-        <div>Olga A</div>
+<div class="p-4" role="main">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">My Contacts</h1>
+    <button
+      onclick="shareContact()"
+      class="bg-teal-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+    >
+      <span class="text-xl">+</span>
+      <span>Share Contact</span>
+    </button>
+  </div>
+
+  <div class="space-y-4" id="contactsList">
+    {% for contact in contacts %}
+    <div
+      class="bg-teal-900 bg-opacity-20 rounded-xl p-4 flex items-center justify-between"
+    >
+      <div>
+        <h3 class="font-semibold">
+          {{ contact.first_name }} {{ contact.last_name or '' }}
+        </h3>
+        {% if contact.username %}
+        <p class="text-sm text-gray-400">@{{ contact.username }}</p>
+        {% endif %}
+      </div>
+      <button
+        onclick="removeContact('{{ contact.id }}')"
+        class="text-red-400 hover:text-red-300"
+      >
+        ✕
+      </button>
     </div>
-    <input type="search" class="search-bar" placeholder="Search...">
-    <button class="nav-button">⋮</button>
-</header>
-
-<main class="p-4">
-    <h1 class="text-2xl font-bold mb-4">{{ page_title }}</h1>
-    <div class="bg-teal-900 bg-opacity-20 rounded-xl p-4 backdrop-blur-sm">
-        <p>This is the {{ page_title }} page. Content coming soon!</p>
-    </div>
-</main>
+    {% else %}
+    <div class="text-center text-gray-400">No contacts added yet</div>
+    {% endfor %}
+  </div>
+</div>
 
 <nav class="bottom-nav">
-    <button class="nav-button">≡</button>
-    <button class="nav-button">🎧</button>
-    <button class="nav-button">🔔</button>
-    <input type="text" class="message-input" placeholder="Message...">
-    <button class="nav-button">📤</button>
+  <button class="nav-button">≡</button>
+  <button class="nav-button">🎧</button>
+  <button class="nav-button">🔔</button>
+  <button class="nav-button">📤</button>
 </nav>
+
+{% endblock %} {% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    window.shareContact = async function () {
+      if (!window.Telegram?.WebApp?.MainButton) {
+        console.error("Telegram WebApp is not available");
+        return;
+      }
+
+      try {
+        const result = await window.Telegram.WebApp.requestContact();
+        if (result) {
+          const response = await AuthManager.fetchWithAuth(
+            "/twa/api/contacts",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                telegram_id: result.user_id,
+                phone: result.phone_number,
+                first_name: result.first_name,
+                last_name: result.last_name,
+              }),
+            }
+          );
+
+          if (response.ok) {
+            if (window.Telegram?.WebApp) {
+              window.Telegram.WebApp.HapticFeedback.notificationOccurred(
+                "success"
+              );
+            }
+            window.location.reload();
+          } else {
+            throw new Error("Failed to save contact");
+          }
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred("error");
+          window.Telegram.WebApp.showAlert("Failed to save contact");
+        }
+      }
+    };
+
+    window.removeContact = async function (contactId) {
+      try {
+        const response = await AuthManager.fetchWithAuth(
+          `/twa/api/contacts/${contactId}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (response.ok) {
+          if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.HapticFeedback.notificationOccurred(
+              "success"
+            );
+          }
+          window.location.reload();
+        } else {
+          throw new Error("Failed to remove contact");
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred("error");
+          window.Telegram.WebApp.showAlert("Failed to remove contact");
+        }
+      }
+    };
+  });
+</script>
 {% endblock %}

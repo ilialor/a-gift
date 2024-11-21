@@ -5,15 +5,21 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 from pydantic import BaseModel, Field
-from app.dao.dao import GiftDAO, GiftListDAO, UserDAO, UserListDAO
+from app.dao.dao import ContactDAO, GiftDAO, GiftListDAO, UserDAO, UserListDAO
 from app.twa.validation import TelegramWebAppValidator
 from app.twa.auth import TWAAuthManager
-from app.dao.session_maker import async_session_maker
+from app.dao.session_maker import async_session_maker, connection
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Optional
 from app.config import settings
 from app.giftme.models import Gift, User
 from app.giftme.schemas import GiftCreate, GiftListCreate, GiftListResponse, GiftResponse
+from app.utils.telegram_client import TelegramContactsService
+from app.service.ContactService import ContactsService 
+from app.utils.bot_instance import telegram_bot
+from telethon import functions, types
+from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, LoginUrl, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 router = APIRouter(prefix="/twa", tags=["twa"])
 templates = Jinja2Templates(directory="app/templates")
@@ -44,7 +50,7 @@ async def groups_page(request: Request):
         logging.error(f"Error loading groups page: {e}")
         return RedirectResponse(url="/twa/error?message=Failed+to+load+groups")
 
-@router.post("/api/groups")
+@router.post("/api/groups", response_model=None)
 async def create_user_list(request: Request, data: dict):
     try:
         user_id = request.state.user_id
@@ -67,7 +73,7 @@ async def create_user_list(request: Request, data: dict):
         logging.error(f"Error creating group: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.patch("/api/groups/{list_id}/toggle")
+@router.patch("/api/groups/{list_id}/toggle", response_model=None)
 async def toggle_group_status(request: Request, list_id: int, data: dict):
     try:
         user_id = request.state.user_id
@@ -184,7 +190,7 @@ class GiftListToggleRequest(BaseModel):
     list_id: int
     action: str  # 'add' or 'remove'
 
-@router.post("/api/giftlist/toggle")
+@router.post("/api/giftlist/toggle", response_model=None)
 async def toggle_gift_in_list(request: Request, toggle_data: GiftListToggleRequest):
     try:
         user_id = request.state.user_id
@@ -276,22 +282,110 @@ async def groups(request: Request):
     })
 
 @router.get("/contacts")
-async def contacts(request: Request):
-    """Your contacts page"""
-    user_id = request.state.user_id  # Get user_id from middleware
+async def contacts_page(request: Request):
+    """Contacts page route"""
+    user = request.state.user
+    if not user:
+        return RedirectResponse(url="/twa/error?message=User+not+found")
 
-    async with async_session_maker() as session:
-        user = await UserDAO.find_by_id(session, user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+    try:
+        async with async_session_maker() as session:
+            contact_dao = ContactDAO(session)
+            contacts = await contact_dao.get_user_contacts(user.id)
+            
+            return templates.TemplateResponse(
+                "pages/contacts.html",
+                {"request": request, "user": user, "contacts": contacts}
+            )
+            
+    except SQLAlchemyError as e:
+        logging.error(f"Database error in contacts page: {e}")
+        return RedirectResponse(url="/twa/error?message=Database+error")
+    except Exception as e:
+        logging.error(f"Error in contacts page: {e}")
+        return RedirectResponse(url="/twa/error?message=Failed+to+load+contacts")
+    
+@router.post("/api/contacts/import", response_model=None)
+async def import_contacts(request: Request):
+    """Import contacts from phone contacts"""
+    try:
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
 
-    return templates.TemplateResponse("pages/contacts.html", {
-        "request": request,
-        "page_title": "My Contacts",
-        "user_id": user_id,
-        "user": user  # Pass the user object to the template
-    })
+        data = await request.json()
+        phone_contacts = data.get("contacts", [])
 
+        async with async_session_maker() as session:
+            # Import contacts via Telegram
+            contacts_service = TelegramContactsService(TelegramContactsService.telegram_bot)
+            result = await contacts_service.import_contacts(phone_contacts)
+
+            # Save imported contacts to database
+            contact_dao = ContactDAO(session)
+            for user_info in result["imported_users"]:
+                contact_data = {
+                    "user_id": user_id,
+                    "contact_telegram_id": user_info["telegram_id"],
+                    "username": user_info["username"],
+                    "first_name": user_info["first_name"],
+                    "last_name": user_info["last_name"]
+                }
+                await contact_dao.add_contact(contact_data)
+
+            return {
+                "status": "success",
+                "imported_count": len(result["imported_users"]),
+                "retry_count": len(result["retry_contacts"])
+            }
+
+    except Exception as e:
+        logging.error(f"Error importing contacts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/contacts", response_model=None)
+async def add_contact(request: Request):
+    """Add a contact"""
+    try:
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        data = await request.json()
+        telegram_id = data.get("telegram_id")
+        if not telegram_id:
+            raise HTTPException(status_code=400, detail="Missing telegram_id")
+
+        async with async_session_maker() as session:
+            contact_service = ContactsService(session)
+            await contact_service.add_contact(user_id, telegram_id)
+            return JSONResponse({"status": "success"})
+
+    except Exception as e:
+        logging.error(f"Error adding contact: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/api/contacts/{contact_id}", response_model=None)
+async def remove_contact(request: Request, contact_id: int):
+    """Remove a contact"""
+    try:
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        async with async_session_maker() as session:
+            contact_service = ContactsService(session)
+            success = await contact_service.remove_contact(user_id, contact_id)
+            
+            if not success:
+                raise HTTPException(status_code=404, detail="Contact not found")
+
+            return JSONResponse({"status": "success"})
+
+    except Exception as e:
+        logging.error(f"Error removing contact: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @router.get("/publish")
 async def publish(request: Request):
     """Publishing page"""
@@ -317,3 +411,113 @@ async def error_page(request: Request, message: Optional[str] = Query(None)):
         "error_message": message or "An unknown error has occurred."
     })
 
+@router.get("/api/contacts", response_model=None)
+async def get_contacts(request: Request):
+    """Get user contacts"""
+    try:
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        async with async_session_maker() as session:
+            user_dao = UserDAO(session)
+            users = await user_dao.get_all_users()  
+            contacts = [
+                {"id": user.id, "username": user.username}
+                for user in users
+                if user.id != user_id
+            ]
+            return contacts
+
+    except Exception as e:
+        logging.error(f"Error getting contacts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/api/contacts/telegram", response_model=None)
+async def get_telegram_contacts(request: Request):
+    """Get user's Telegram contacts"""
+    try:
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        async with async_session_maker() as session:
+            user = await UserDAO.find_by_id(session, user_id)
+            if not user or not user.telegram_id:
+                raise HTTPException(status_code=400, detail="Telegram ID not found")
+
+            # Получаем контакты пользователя через Telegram API
+            # telegram_contacts = await get_telegram_user_contacts(user.telegram_id)
+            
+            # Получаем существующих пользователей с этими Telegram ID
+            # user_dao = UserDAO(session)
+            # registered_users = await user_dao.get_users_by_telegram_ids(
+            #     [contact['id'] for contact in telegram_contacts]
+            # )
+            
+            # Создаем маппинг telegram_id -> user_id
+            # user_mapping = {user.telegram_id: user.id for user in registered_users}
+            
+            # Добавляем user_id к контактам, если пользователь зарегистрирован
+            # contacts_with_ids = [
+            #     {**contact, 'id': user_mapping.get(contact['id'])}
+            #     for contact in telegram_contacts
+            #     if contact['id'] in user_mapping
+            # ]
+            
+            return [{"id": 1, "username": "test"}]
+
+    except Exception as e:
+        logging.error(f"Error getting Telegram contacts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/groups/{list_id}/members", response_model=None)
+async def add_list_member(list_id: int, data: dict, request: Request):
+    """Add a member to a group"""
+    try:
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        async with async_session_maker() as session:
+            user_list_dao = UserListDAO(session)
+            user_list_data = {
+                "user_id": user_id,
+                "added_user_id": data["user_id"],
+                "gift_list_id": list_id,
+                "name": "Member"  # You might want to customize this
+            }
+            await user_list_dao.add_user_to_list(user_list_data)
+            return {"status": "success"}
+
+    except Exception as e:
+        logging.error(f"Error adding member: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/api/contacts/saved", response_model=None)
+async def get_saved_contacts(request: Request):
+    """Get complete list of saved phone contacts"""
+    try:
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        contacts_service = TelegramContactsService()
+        # Use getSaved method from contacts functions
+        saved_contacts = await contacts_service.client(functions.contacts.GetSavedRequest())
+
+        # Format response
+        contacts = []
+        for contact in saved_contacts:
+            contacts.append({
+                "phone": contact.phone,
+                "first_name": contact.first_name,
+                "last_name": contact.last_name,
+                "date": contact.date
+            })
+
+        return {"contacts": contacts}
+            
+    except Exception as e:
+        logging.error(f"Error getting saved contacts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -131,8 +131,10 @@ async def error_page(request: Request, message: Optional[str] = Query(None)):
     })
 
 @router.post("/refresh", response_model=STokenRefreshResponse)
-@connection(commit=True)
-async def refresh_tokens(token_request: STokenRefreshRequest, session: AsyncSession):
+async def refresh_tokens(
+    token_request: STokenRefreshRequest,
+    session: AsyncSession = Depends(async_session_maker)
+):
     user = await UserDAO.find_by_refresh_token(session, token_request.refresh_token)
     if not user:
         raise HTTPException(

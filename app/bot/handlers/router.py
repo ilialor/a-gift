@@ -56,10 +56,10 @@ async def cmd_start(message: Message, session, **kwargs):
 
         # Changed URL to point directly to index page with auth params
         webapp_url = f"{settings.BASE_SITE}/twa/?startParam={access_token}&refresh_token={refresh_token}"
-        login_url = LoginUrl(
-            url=webapp_url,
-            request_write_access=True
-        )
+        # login_url = LoginUrl(
+        #     url=webapp_url,
+        #     request_write_access=True
+        # )
         login_btn = InlineKeyboardButton(text="Open Giftme", url=webapp_url)
         keyboard = InlineKeyboardMarkup(inline_keyboard=[[login_btn]])
         

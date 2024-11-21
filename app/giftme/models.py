@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy import ARRAY, JSON, ForeignKey, Integer, String, Table, Enum, Text, text, Column, DateTime, BigInteger, PrimaryKeyConstraint
+from sqlalchemy import ARRAY, JSON, ForeignKey, Integer, String, Table, Enum, Text, UniqueConstraint, text, Column, DateTime, BigInteger, PrimaryKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from app.dao.database import Base, uniq_str_an, array_or_none_an
@@ -38,6 +38,11 @@ class User(Base):
         'Calendar',
         secondary='calendar_participants',
         back_populates='participants'
+    )
+    contacts: Mapped[List["Contact"]] = relationship(
+        "Contact",
+        back_populates="user",
+        cascade="all, delete-orphan"
     )
 
 class Profile(Base):
@@ -231,3 +236,32 @@ calendar_gift = Table(
     Column('calendar_id', ForeignKey('calendar_events.id', ondelete='CASCADE'), primary_key=True),
     Column('gift_id', ForeignKey('gifts.id', ondelete='CASCADE'), primary_key=True)
 )
+
+class Contact(Base):    
+    """Модель для хранения контактов пользователя"""
+    __tablename__ = 'contacts'
+
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'))
+    contact_telegram_id: Mapped[int] = mapped_column(BigInteger)
+    username: Mapped[str | None]
+    first_name: Mapped[str]
+    last_name: Mapped[str | None]
+
+    # Связи
+    user: Mapped["User"] = relationship("User", back_populates="contacts", foreign_keys=[user_id])
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'contact_telegram_id', name='uq_user_contact'),
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "contact_telegram_id": self.contact_telegram_id,
+            "username": self.username,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
+        }

@@ -1,11 +1,11 @@
 import logging
 from typing import Optional, List
-from sqlalchemy import select, func, update as sa_update
+from sqlalchemy import select, func, update as sa_update, and_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from app.dao.base import BaseDAO
-from app.giftme.models import Gift, GiftList, Payment, User, Profile, UserList
+from app.giftme.models import Contact, Gift, GiftList, Payment, User, Profile, UserList
 from app.giftme.schemas import UserFilterPydantic, UserPydantic
 
 
@@ -64,19 +64,11 @@ class UserDAO(BaseDAO[User]):
 
         return user  # Возвращаем объект пользователя
 
-    @classmethod
-    async def get_all_users(cls, session: AsyncSession):
-        # Создаем запрос для выборки всех пользователей
-        query = select(cls.model)
-
-        # Выполняем запрос и получаем результат
-        result = await session.execute(query)
-
-        # Извлекаем записи как объекты модели
-        records = result.scalars().all()
-
-        # Возвращаем список всех пользователей
-        return records
+    async def get_all_users(self) -> List[User]:
+        """Get all users"""
+        query = select(self.model)
+        result = await self.session.execute(query)
+        return result.scalars().all()
 
     @classmethod
     async def get_username_id(cls, session: AsyncSession):
@@ -152,6 +144,12 @@ class UserDAO(BaseDAO[User]):
 
     async def get_user_by_id(self, user_id: int) -> Optional[User]:
         return await self.session.get(User, user_id)
+
+    async def get_users_by_telegram_ids(self, telegram_ids: List[int]) -> List[User]:
+        """Get users by their Telegram IDs"""
+        query = select(self.model).where(self.model.telegram_id.in_(telegram_ids))
+        result = await self.session.execute(query)
+        return result.scalars().all()
 
 class ProfileDAO(BaseDAO[Profile]):
     model = Profile
@@ -386,3 +384,69 @@ class UserListDAO(BaseDAO[UserList]):
             logging.error(f"Error toggling member status: {e}")
             await self.session.rollback()
             return False
+
+class ContactDAO(BaseDAO[Contact]):
+    model = Contact
+
+    async def get_user_contacts(self, user_id: int) -> List[Contact]:
+        """Get user's contacts"""
+        try:
+            query = (
+                select(self.model)
+                .where(self.model.user_id == user_id)
+                .options(selectinload(self.model.user))
+            )
+            result = await self.session.execute(query)
+            return result.scalars().all()
+        except SQLAlchemyError as e:
+            logging.error(f"Error getting user contacts: {e}")
+            raise
+
+    async def add_contact(self, contact_data: dict) -> Optional[Contact]:
+        """Add a new contact"""
+        try:
+            contact = self.model(**contact_data)
+            self.session.add(contact)
+            await self.session.commit()
+            await self.session.refresh(contact)
+            return contact
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+            logging.error(f"Error adding contact: {e}")
+            raise
+
+    async def remove_contact(self, user_id: int, contact_id: int) -> bool:
+        """Remove contact if it belongs to user"""
+        try:
+            contact = await self.session.get(self.model, contact_id)
+            if contact and contact.user_id == user_id:
+                await self.session.delete(contact)
+                await self.session.commit()
+                return True
+            return False
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+            logging.error(f"Error removing contact: {e}")
+            raise
+
+    async def get_contact_by_telegram_id(self, user_id: int, telegram_id: int) -> Optional[Contact]:
+        """
+        Найти контакт по Telegram ID
+        
+        Args:
+            user_id: ID пользователя, которому принадлежит контакт
+            telegram_id: Telegram ID искомого контакта
+        """
+        try:
+            result = await self.session.execute(
+                select(self.model).where(
+                    and_(
+                        self.model.user_id == user_id,
+                        self.model.contact_telegram_id == telegram_id
+                    )
+                )
+            )
+            return result.scalar_one_or_none()
+        except SQLAlchemyError as e:
+            logging.error(f"Error getting contact by telegram_id: {e}")
+            raise

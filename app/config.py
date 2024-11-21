@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     secret_key: str  
     session_secret_key: str  
     algorithm: str
+    TELEGRAM_API_ID: int
+    TELEGRAM_API_HASH: str
+    TELEGRAM_PHONE: str
     
     # DATABASE_SQLITE = 'sqlite+aiosqlite:///data/db.sqlite3'
     model_config = SettingsConfigDict(

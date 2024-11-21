@@ -44,16 +44,30 @@
 
             <!-- List Details -->
             <div id="list-{{ list.id }}-content" class="hidden border-t border-teal-800 p-4">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between mb-4">
                     <span>{{ list.description or 'No description' }}</span>
-                    <!-- Toggle Switch -->
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" 
-                               {% if list.description == 'active' %}checked{% endif %}
-                               onchange="toggleMember('{{ list.id }}', this.checked)"
-                               class="sr-only peer">
-                        <div class="w-14 h-8 bg-gray-600 peer-focus:outline-none rounded-full peer-checked:after:translate-x-6 peer-checked:bg-teal-600 after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all"></div>
-                    </label>
+                    <!-- Add User Button -->
+                    <button onclick="openAddUserModal('{{ list.id }}')" 
+                            class="bg-teal-600 text-white p-2 rounded-full hover:bg-teal-700 transition-colors">
+                        <span class="text-xl">+</span>
+                    </button>
+                </div>
+                <!-- Members List -->
+                <div class="space-y-2">
+                    {% if list.added_user %}
+                    <div class="flex items-center justify-between p-2 bg-teal-900 bg-opacity-20 rounded">
+                        <span>{{ list.added_user.username }}</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" 
+                                   {% if list.description == 'active' %}checked{% endif %}
+                                   onchange="toggleMember('{{ list.id }}', this.checked)"
+                                   class="sr-only peer">
+                            <div class="w-14 h-8 bg-gray-600 peer-focus:outline-none rounded-full peer-checked:after:translate-x-6 peer-checked:bg-teal-600 after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all"></div>
+                        </label>
+                    </div>
+                    {% else %}
+                    <div class="text-gray-400 text-center">No members yet</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -71,6 +85,22 @@
 </nav>
 
 {% endblock %}
+
+<!-- Add User Modal -->
+<div id="addUserModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+    <div class="bg-teal-900 bg-opacity-90 rounded-xl p-6 m-4 w-full max-w-md backdrop-blur-sm">
+        <h2 class="text-xl font-bold mb-4">Add User to Group</h2>
+        <div class="max-h-64 overflow-y-auto space-y-2" id="usersList">
+            <!-- Users will be populated here -->
+        </div>
+        <div class="flex justify-end space-x-2 mt-4">
+            <button onclick="closeAddUserModal()" 
+                    class="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-700 transition-colors">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
 
 {% block extra_scripts %}
 <script>
@@ -129,6 +159,84 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error:', error);
             checkbox.checked = !checkbox.checked;
+        }
+    };
+
+    let currentListId = null;
+
+    window.openAddUserModal = async function(listId) {
+        currentListId = listId;
+        const modal = document.getElementById('addUserModal');
+        const usersList = document.getElementById('usersList');
+        
+        if (!modal || !usersList) {
+            console.error('Required DOM elements not found');
+            alert('Something went wrong. Please try again.');
+            return;
+        }
+
+        try {
+            const response = await AuthManager.fetchWithAuth('/twa/api/contacts/telegram');
+            if (!response.ok) {
+                throw new Error('Failed to fetch contacts');
+            }
+            
+            const users = await response.json();
+            
+            if (!users.length) {
+                usersList.innerHTML = `
+                    <div class="text-center text-gray-400 py-4">
+                        No contacts found. Only your Telegram contacts who are registered in the app will appear here.
+                    </div>`;
+            } else {
+                usersList.innerHTML = users.map(user => `
+                    <div class="flex items-center justify-between p-2 bg-teal-900 bg-opacity-20 rounded">
+                        <div class="flex items-center space-x-2">
+                            <img src="${user.photo_url || ''}" alt="" class="w-8 h-8 rounded-full bg-gray-600">
+                            <span>${user.username || user.first_name}</span>
+                        </div>
+                        <button onclick="addUserToList(${currentListId}, ${user.id})"
+                                class="bg-teal-600 text-white px-3 py-1 rounded hover:bg-teal-700 transition-colors">
+                            Add
+                        </button>
+                    </div>
+                `).join('');
+            }
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to load contacts. Please try again later.');
+        }
+    };
+
+    window.closeAddUserModal = function() {
+        const modal = document.getElementById('addUserModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        currentListId = null;
+    };
+
+    window.addUserToList = async function(listId, userId) {
+        try {
+            const response = await AuthManager.fetchWithAuth(`/twa/api/groups/${listId}/members`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ user_id: userId })
+            });
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                const error = await response.json();
+                alert(error.detail || 'Failed to add user');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to add user');
         }
     };
 });

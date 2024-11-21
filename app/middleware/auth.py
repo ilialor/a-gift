@@ -40,7 +40,7 @@ class TelegramWebAppMiddleware(BaseHTTPMiddleware):
             logging.info(f"Refresh token present: {bool(refresh_token)}")
             logging.info(f"Init data present: {bool(init_data)}")
             logging.info(f"Method: {request.method}")
-            logging.info(f"Headers: {dict(request.headers)}")
+            # logging.info(f"Headers: {dict(request.headers)}")
 
             if not start_param or not refresh_token:
                 # Check if it's an API request
