@@ -9,6 +9,7 @@ from app.giftme.schemas import UserPydantic, ProfilePydantic, UserFilterPydantic
 from app.twa.auth import TWAAuthManager  
 from app.config import settings  
 from fastapi import Request  
+from app.utils.bot_instance import telegram_bot
 
 auth_manager = TWAAuthManager(settings.secret_key)
 
@@ -68,3 +69,20 @@ async def cmd_start(message: Message, session, **kwargs):
     except Exception as e:
         logging.error(f"Error in cmd_start: {e}")
         await message.answer("An error occurred during authentication. Please try again later.")
+
+@router.message()
+async def handle_message(message: Message):
+    # Use the bot's Telegram bot instance
+    bot_client = telegram_bot
+    user_message = message.text
+
+    # Process the user's message
+    if user_message.lower() == 'hello':
+        response_text = "Hello! How can I assist you today?"
+    elif user_message.lower() == 'help':
+        response_text = "Here are some commands you can use:\n/start - Start the bot\n/help - Get help information"
+    else:
+        response_text = "I'm sorry, I didn't understand that. Type /help for a list of commands."
+
+    # Send the response using the bot client
+    await bot_client.send_message(chat_id=message.chat.id, text=response_text)

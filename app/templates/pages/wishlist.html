@@ -6,7 +6,7 @@
     <div class="profile-section">
         <a href="/twa/" class="nav-button">←</a>
         <div class="profile-pic"></div>
-        <div>{% if user %}{{ user.username }}{% else %}Guest{% endif %}</div>
+        <div>{{ user.username }}</div>
     </div>
     <div>⋮</div>
 </div>
@@ -168,6 +168,15 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleDot.classList.toggle('translate-x-6', !isChecked);
         }
     }
+
+    window.toggleList = function(listId) {
+        const content = document.getElementById(`list-${listId}-content`);
+        const arrow = content.previousElementSibling.querySelector('.list-arrow');
+        const isHidden = content.classList.contains('hidden');
+        
+        content.classList.toggle('hidden');
+        arrow.textContent = isHidden ? '▼' : '▶';
+    };
 
     if (createListForm) {
         createListForm.addEventListener('submit', async (e) => {

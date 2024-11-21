@@ -16,8 +16,12 @@ class TelegramWebAppMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path.startswith('/twa/'):
-            # Skip auth check for error page
-            if request.url.path in ['/twa/error']:
+            # Allow unauthenticated access to the index page
+            if request.url.path in ['/twa/', '/twa/index']:
+                request.state.user = None
+                return await call_next(request)
+            # Skip auth check for error page and public gift detail
+            if request.url.path in ['/twa/error'] or request.url.path.startswith('/twa/public/gifts/'):
                 request.state.user = None
                 return await call_next(request)
 

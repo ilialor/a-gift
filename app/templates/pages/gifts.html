@@ -50,11 +50,11 @@
                 <div class="flex justify-between items-start mb-2">
                     <h3 class="text-lg font-bold">{{ gift.name }}</h3>
                     <div class="flex space-x-2">
-                        <button onclick="shareGift('{{ gift.id }}', '{{ gift.name }}')" 
-                                class="bg-teal-600 text-white px-3 py-1 rounded-lg flex items-center text-sm hover:bg-teal-700">
+                        <a href="#" onclick="shareGift('{{ gift.id }}', '{{ gift.name }}');"
+                           class="bg-teal-600 text-white px-3 py-1 rounded-lg flex items-center text-sm hover:bg-teal-700">
                             <span class="mr-1">🔗</span>Share
-                        </button>
-                        <button onclick="addToWishlist('{{ gift.id }}')"
+                        </a>
+                        <button onclick="addToWishlist('{{ gift.id }}')" 
                                 class="bg-teal-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-teal-700">
                             + List
                         </button>
@@ -97,8 +97,12 @@
 <script src="https://telegram.org/js/telegram-widget.js?22"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    if (!window.Telegram?.WebApp) {
+        console.warn('Telegram WebApp is not available. Running in web mode.');
+    }
+    
     const currentUserId = {{ user.id }};
-    console.log('currentUserId:', currentUserId);
+    console.log('currentUserId:', currentUserId, 'platform:', window.Telegram?.WebApp?.platform || 'web');
 
     function createGiftElement(gift) {
         const giftDiv = document.createElement('div');
@@ -107,11 +111,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="flex justify-between items-start mb-2">
                 <h3 class="text-lg font-bold">${gift.name}</h3>
                 <div class="flex space-x-2">
-                    <button onclick="shareGift('${gift.id}', '${gift.name}')" 
-                            class="bg-teal-600 text-white px-3 py-1 rounded-lg flex items-center text-sm hover:bg-teal-700">
+                    <a href="#" onclick="shareGift('${gift.id}', '${gift.name}');"
+                       class="bg-teal-600 text-white px-3 py-1 rounded-lg flex items-center text-sm hover:bg-teal-700">
                         <span class="mr-1">🔗</span>Share
-                    </button>
-                    <button onclick="handleAddToWishlist('${gift.id}')"
+                    </a>
+                    <button onclick="addToWishlist('${gift.id}')"
                             class="bg-teal-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-teal-700">
                         + List
                     </button>
@@ -124,13 +128,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.shareGift = function(giftId, giftName) {
-        const shareUrl = `${window.location.origin}/gifts/${giftId}`;
-        if (window.Telegram?.WebApp) {
-            window.Telegram.WebApp.switchInlineQuery(
-                `Check out this gift: ${giftName}!\n${shareUrl}`,
-                ['users', 'groups']
-            );
-        }
+        const shareUrl = encodeURIComponent(`${window.location.origin}/twa/public/gifts/${giftId}`);
+        const text = encodeURIComponent(`I really love this! ${giftName}!`);
+        const telegramShareUrl = `https://t.me/share/url?url=${shareUrl}&text=${text}`;
+        window.open(telegramShareUrl, '_blank');
     };
 
     window.shareList = function(listId, listName) {
@@ -143,7 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Define the gift form handler
     const form = document.getElementById('giftForm');
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -169,7 +169,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const gift = await response.json();
                 console.log('Gift created:', gift);
                 
-                // Находим контейнер для списка подарков внутри секции "My Gifts"
                 const giftsContainer = document.querySelector('.mt-8 .space-y-4');
                 const emptyMessage = giftsContainer.querySelector('p.text-center');
                 if (emptyMessage) {
@@ -177,7 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 giftsContainer.insertBefore(createGiftElement(gift), giftsContainer.firstChild);
                 
-                // Очищаем форму
                 form.reset();
                 
                 if (window.Telegram?.WebApp) {
@@ -207,12 +205,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Define the handleAddToWishlist function in the global scope
-    window.handleAddToWishlist = function(giftId) {
+    window.addToWishlist = function(giftId) {
         console.log('Adding gift to wishlist:', giftId);
         const url = AuthManager.addParamsToUrl(`/twa/wishlist?gift_id=${giftId}`);
         window.location.href = url;
     };
 });
 </script>
-{% endblock %} 
+{% endblock %}

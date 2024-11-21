@@ -198,6 +198,16 @@ class GiftDAO(BaseDAO[Gift]):
             logging.error(f"Error getting gift with lists: {e}")
             raise
 
+    async def get_gift_by_id(self, gift_id: int) -> Optional[Gift]:
+        """Retrieve a gift by its ID"""
+        try:
+            stmt = select(self.model).where(self.model.id == gift_id)
+            result = await self.session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logging.error(f"Error retrieving gift by ID: {e}")
+            return None
+
 class GiftListDAO(BaseDAO[GiftList]):
     model = GiftList
 

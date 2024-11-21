@@ -1,4 +1,5 @@
 from telethon import TelegramClient, functions
+from telethon.sessions import StringSession
 import asyncio
 import logging
 import os
@@ -10,18 +11,13 @@ class TelegramContactsService:
     _lock = asyncio.Lock()
 
     def __init__(self):
-        if not TelegramContactsService._client:
-            session_file = os.path.join('sessions', 'telegram_session')
-            os.makedirs('sessions', exist_ok=True)
-            
-            self.client = TelegramClient(
-                session_file,
-                settings.TELEGRAM_API_ID,
-                settings.TELEGRAM_API_HASH
-            )
-            TelegramContactsService._client = self.client
-        else:
-            self.client = TelegramContactsService._client
+        # Create a new client instance with a unique session string
+        self.client = TelegramClient(
+            StringSession(), 
+            settings.TELEGRAM_API_ID, 
+            settings.TELEGRAM_API_HASH
+        )
+        TelegramContactsService._client = self.client
 
     @classmethod
     async def get_instance(cls):
@@ -38,7 +34,7 @@ class TelegramContactsService:
             if not await self.client.is_user_authorized():
                 phone = settings.TELEGRAM_PHONE
                 await self.client.send_code_request(phone)
-                code = input('Enter the code you received: ')  # Для первого запуска
+                code = input('Enter the code you received: ')  # For initial run
                 await self.client.sign_in(phone, code)
 
     async def get_saved_contacts(self):

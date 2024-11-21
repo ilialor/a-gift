@@ -289,6 +289,9 @@ async def contacts_page(request: Request):
         return RedirectResponse(url="/twa/error?message=User+not+found")
 
     try:
+        contacts_service = TelegramContactsService()
+        await contacts_service.start()
+        contacts = await contacts_service.get_saved_contacts()
         async with async_session_maker() as session:
             contact_dao = ContactDAO(session)
             contacts = await contact_dao.get_user_contacts(user.id)
@@ -521,3 +524,19 @@ async def get_saved_contacts(request: Request):
     except Exception as e:
         logging.error(f"Error getting saved contacts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/public/gifts/{gift_id}")
+async def public_gift_detail(request: Request, gift_id: int):
+    try:
+        async with async_session_maker() as session:
+            gift_dao = GiftDAO(session)
+            gift = await gift_dao.get_gift_by_id(gift_id)
+            if not gift:
+                raise HTTPException(status_code=404, detail="Gift not found")
+            return templates.TemplateResponse("pages/gift_detail.html", {
+                "request": request,
+                "gift": gift
+            })
+    except Exception as e:
+        logging.error(f"Error fetching gift details: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

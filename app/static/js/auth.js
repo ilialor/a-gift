@@ -8,7 +8,7 @@ const AuthManager = {
   saveParams() {
       const urlParams = new URLSearchParams(window.location.search);
       const authData = {
-          startParam: urlParams.get('startParam'),
+          startParam: urlParams.get('startParam') || window.Telegram.WebApp.initDataUnsafe?.query_id,
           refresh_token: urlParams.get('refresh_token'),
           initData: window.Telegram?.WebApp?.initData
       };
@@ -101,15 +101,24 @@ const AuthManager = {
    * Инициализировать менеджер аутентификации
    */
   init() {
-      this.saveParams();
-      this.handleLinks();
-
-      // Инициализация Telegram WebApp
-      if (window.Telegram?.WebApp) {
+      if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
           window.Telegram.WebApp.ready();
+          window.Telegram.WebApp.setHeaderColor('secondary_bg_color');
+          window.Telegram.WebApp.setBackgroundColor('secondary_bg_color');
+          
+          if (window.Telegram.WebApp.BackButton) {
+              window.Telegram.WebApp.BackButton.show();
+          }
+          
+          window.Telegram.WebApp.expand();
       }
 
-      console.log('AuthManager initialized');
+      this.saveParams();
+      this.handleLinks();
+      console.log('AuthManager initialized', {
+          isWebApp: typeof window !== 'undefined' ? !!window.Telegram?.WebApp : false,
+          platform: typeof window !== 'undefined' ? window.Telegram?.WebApp?.platform || 'web' : 'server'
+      });
   }
 };
 
