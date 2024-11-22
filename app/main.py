@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from app.bot.create_bot import bot, dp, stop_bot, start_bot
 from app.bot.handlers.router import router as bot_router
 from app.config import settings
+from app.dao.dao import GiftDAO
 from app.giftme.router import router as giftme_router
 from app.twa.router import router as twa_router
 from fastapi.staticfiles import StaticFiles

@@ -8,10 +8,11 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="{{ url_for('static', path='js/auth.js') }}"></script>
     
     <!-- Calendar Component Script -->
     <script src="{{ url_for('static', path='js/components/Calendar.js') }}"></script>
+    <!-- Change path to favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='favicon.ico') }}">
 </head>
 <body>
     <div class="light-dots"></div>
@@ -20,9 +21,14 @@
     </div>
     {% block extra_scripts %}{% endblock %}
 
+    <!-- Include auth.js at the end of the body -->
+    <script src="{{ url_for('static', path='js/auth.js') }}" defer></script>
+
     <script>
         // Initialize both auth and calendar on page load
         document.addEventListener('DOMContentLoaded', () => {
+            // Получаем имя бота из серверного рендеринга
+            AuthManager.setBotUsername('{{ bot_username }}');
             // Initialize calendar if the container exists
             const calendarRoot = document.getElementById('calendar-root');
             if (calendarRoot) {

@@ -1,7 +1,10 @@
 /**
  * Менеджер аутентификации для Telegram WebApp
  */
-const AuthManager = {
+// Remove 'const' to define AuthManager in the global scope
+AuthManager = {
+  botUsername: null, 
+
   /**
    * Сохранить параметры аутентификации при первой загрузке
    */
@@ -87,14 +90,66 @@ const AuthManager = {
    * Выполнить запрос с авторизацией
    */
   async fetchWithAuth(url, options = {}) {
+      const authData = this.getParams();
+      if (!authData) {
+          console.error('No auth data available');
+          throw new Error('Authentication required');
+      }
+
       const headers = {
           ...options.headers,
-          ...this.addAuthHeaders()
+          'X-Start-Param': authData.startParam,
+          'X-Refresh-Token': authData.refresh_token,
+          'X-Init-Data': authData.initData || ''
       };
 
-      const response = await fetch(url, { ...options, headers });
-      this.handleTokenRefresh(response);
-      return response;
+      try {
+          const response = await fetch(url, { ...options, headers });
+
+          // Handle token refresh
+          const newAccessToken = response.headers.get('X-New-Access-Token');
+          if (newAccessToken) {
+              authData.startParam = newAccessToken;
+              localStorage.setItem('authData', JSON.stringify(authData));
+              console.log('Access token refreshed');
+          }
+
+          if (!response.ok) {
+              // Логируем детали запроса при ошибке
+              console.error('Auth request failed:', {
+                  status: response.status,
+                  statusText: response.statusText,
+                  headers: Object.fromEntries(response.headers.entries()),
+                  authHeaders: headers
+              });
+
+              if (response.status === 401) {
+                  // Очищаем текущие данные авторизации
+                  localStorage.removeItem('authData');
+                  // Используем сохраненное имя бота
+                  if (this.botUsername) {
+                      window.location.href = `https://t.me/${this.botUsername}`;
+                  } else {
+                      // Если имя бота не установлено, делаем запрос к API
+                      try {
+                          const botInfoResponse = await fetch('/twa/api/bot-info');
+                          const botInfo = await botInfoResponse.json();
+                          window.location.href = `https://t.me/${botInfo.username}`;
+                      } catch (e) {
+                          console.error('Failed to get bot username:', e);
+                          throw new Error('Authentication required. Please return to the bot.');
+                      }
+                  }
+                  throw new Error('Session expired. Please reauthorize through the bot.');
+              }
+              throw new Error(response.statusText || 'Request failed');
+          }
+
+          return response;
+      } catch (error) {
+          console.error('Fetch error:', error);
+          throw error;
+      }
   },
 
   /**
@@ -111,16 +166,85 @@ const AuthManager = {
           }
           
           window.Telegram.WebApp.expand();
+
+          // Проверяем наличие return_url в параметрах
+          const urlParams = new URLSearchParams(window.location.search);
+          const returnTo = urlParams.get('return_to');
+          if (returnTo) {
+              // Редиректим на сохраненный URL
+              window.location.href = decodeURIComponent(returnTo);
+              return;
+          }
       }
 
       this.saveParams();
       this.handleLinks();
       console.log('AuthManager initialized', {
           isWebApp: typeof window !== 'undefined' ? !!window.Telegram?.WebApp : false,
-          platform: typeof window !== 'undefined' ? window.Telegram?.WebApp?.platform || 'web' : 'server'
+          platform: typeof window !== 'undefined' ? window.Telegram?.WebApp?.platform || 'web' : 'server',
+          botUsername: this.botUsername
       });
+  },
+
+  setBotUsername(username) {
+      this.botUsername = username;
+      console.log('Bot username set:', username);
+  },
+
+  isWebAppEnvironment() {
+      return !!(window.Telegram?.WebApp?.initData);
+  },
+
+  /**
+   * Прямая авторизация через WebApp
+   */
+  async directAuth() {
+      try {
+          // Log environment info for debugging
+          console.log('WebApp environment check:', {
+              isWebApp: !!(window.Telegram?.WebApp),
+              initDataExists: !!(window.Telegram?.WebApp?.initData)
+          });
+
+          // Проверяем наличие WebApp и initData
+          if (!window.Telegram?.WebApp?.initData) {
+              throw new Error('No Telegram WebApp data available');
+          }
+
+          const response = await fetch('/twa/api/auth/direct', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                  init_data: window.Telegram.WebApp.initData,
+                  return_url: window.location.pathname + window.location.search
+              })
+          });
+
+          if (!response.ok) {
+              const data = await response.json();
+              throw new Error(data.detail || 'Authentication failed');
+          }
+
+          const data = await response.json();
+          const authData = {
+              startParam: data.access_token,
+              refresh_token: data.refresh_token,
+              initData: window.Telegram.WebApp.initData
+          };
+          
+          localStorage.setItem('authData', JSON.stringify(authData));
+          return data;
+      } catch (error) {
+          console.error('Direct auth error:', error);
+          throw error;
+      }
   }
 };
+
+// Ensure AuthManager is attached to the window object
+window.AuthManager = AuthManager;
 
 // Export для использования в модулях
 if (typeof module !== 'undefined' && module.exports) {

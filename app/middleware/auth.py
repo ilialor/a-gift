@@ -1,5 +1,5 @@
 from fastapi import Request, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.twa.auth import TWAAuthManager
 from app.twa.validation import TelegramWebAppValidator
@@ -16,16 +16,7 @@ class TelegramWebAppMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path.startswith('/twa/'):
-            # Allow unauthenticated access to the index page
-            if request.url.path in ['/twa/', '/twa/index']:
-                request.state.user = None
-                return await call_next(request)
-            # Skip auth check for error page and public gift detail
-            if request.url.path in ['/twa/error'] or request.url.path.startswith('/twa/public/gifts/'):
-                request.state.user = None
-                return await call_next(request)
-
-            # Get auth parameters from query params or headers
+            # Get all possible auth parameters
             start_param = (
                 request.query_params.get('startParam') or 
                 request.headers.get('X-Start-Param')
@@ -39,75 +30,78 @@ class TelegramWebAppMiddleware(BaseHTTPMiddleware):
                 request.headers.get('X-Init-Data')
             )
 
-            logging.info(f"Processing request to {request.url.path}")
-            logging.info(f"Start param present: {bool(start_param)}")
-            logging.info(f"Refresh token present: {bool(refresh_token)}")
-            logging.info(f"Init data present: {bool(init_data)}")
-            logging.info(f"Method: {request.method}")
-            # logging.info(f"Headers: {dict(request.headers)}")
-
-            if not start_param or not refresh_token:
-                # Check if it's an API request
-                if request.url.path.startswith('/twa/api/'):
-                    raise HTTPException(status_code=401, detail="Unauthorized")
-                request.state.user = None
-                return RedirectResponse(url="/twa/error?message=Missing+authentication+parameters")
+            logging.info(f"Auth parameters: start_param={bool(start_param)}, refresh_token={bool(refresh_token)}, init_data={bool(init_data)}")
 
             try:
-                # Validate Telegram data if present
-                if init_data:
+                # Try to authenticate user
+                user = None
+
+                # First try token authentication
+                if start_param and refresh_token:
+                    try:
+                        user_id = self.auth_manager.validate_token(start_param)
+                        async with async_session_maker() as session:
+                            user = await UserDAO(session).get_user_by_id(user_id)
+                    except Exception as e:
+                        logging.error(f"Token validation failed: {e}")
+
+                # If token auth failed but we have init_data, try Telegram validation
+                if not user and init_data:
                     try:
                         validated_data = self.telegram_validator.validate_init_data(init_data)
-                        request.state.telegram_data = validated_data
-                        logging.info(f"Validated Telegram data: {validated_data}")
+                        user_telegram_id = validated_data["user"]["id"]
+                        
+                        async with async_session_maker() as session:
+                            from app.giftme.schemas import UserFilterPydantic
+                            filter_model = UserFilterPydantic(telegram_id=user_telegram_id)
+                            user = await UserDAO.find_one_or_none(session=session, filters=filter_model)
+
+                            # Create user if not exists
+                            if not user:
+                                from app.giftme.schemas import UserPydantic, ProfilePydantic
+                                profile = ProfilePydantic(
+                                    first_name=validated_data["user"].get("first_name"),
+                                    last_name=validated_data["user"].get("last_name")
+                                )
+                                values = UserPydantic(
+                                    telegram_id=user_telegram_id,
+                                    username=validated_data["user"].get("username"),
+                                    profile=profile
+                                )
+                                user = await UserDAO.add(session=session, values=values)
+
+                                # Create new tokens
+                                access_token = self.auth_manager.create_access_token(user.id)
+                                refresh_token = self.auth_manager.create_refresh_token(user.id)
+                                await UserDAO.update_refresh_token(session, user.id, refresh_token)
+
                     except Exception as e:
-                        logging.error(f"Telegram data validation failed: {e}")
-                        return RedirectResponse(url="/twa/error?message=Invalid+Telegram+data")
+                        logging.error(f"Telegram validation failed: {e}")
 
-                # Validate the token
-                user_id = self.auth_manager.validate_token(start_param)
-
-                # Get user from database
-                async with async_session_maker() as session:
-                    user = await UserDAO(session).get_user_by_id(user_id)
-
-                if not user:
-                    logging.warning(f"User not found for user_id: {user_id}")
-                    request.state.user = None
-                    return RedirectResponse(url="/twa/error?message=User+not+found")
-
-                # Store user info in request state
+                # Set user in request state
                 request.state.user = user
-                request.state.user_id = user.id
+                if user:
+                    request.state.user_id = user.id
+                    logging.info(f"User authenticated: {user.id}")
 
-                # Handle token refresh if needed
-                if self.auth_manager.should_refresh_token(start_param):
-                    new_access_token = self.auth_manager.create_access_token(user.id)
-                    response = await call_next(request)
-                    response.headers['X-New-Access-Token'] = new_access_token
-                    response.headers['Access-Control-Expose-Headers'] = 'X-New-Access-Token'
-                    return response
-
-                # Process the request with auth data
+                # Process the request
                 response = await call_next(request)
-                
+
                 # Add CORS headers for API requests
                 if request.url.path.startswith('/twa/api/'):
                     response.headers['Access-Control-Allow-Headers'] = 'X-Start-Param, X-Refresh-Token, X-Init-Data'
                     response.headers['Access-Control-Allow-Origin'] = '*'
-                
+
                 return response
 
             except Exception as e:
-                logging.error(f"Exception during authentication: {str(e)}")
-                logging.error(f"Request path: {request.url.path}")
-                logging.error(f"Request method: {request.method}")
-                request.state.user = None
-                
-                # Return JSON response for API requests
+                logging.error(f"Auth middleware error: {e}")
                 if request.url.path.startswith('/twa/api/'):
-                    raise HTTPException(status_code=401, detail="Authentication failed")
-                
+                    return JSONResponse(
+                        status_code=401,
+                        content={"detail": "Authentication failed"}
+                    )
                 return RedirectResponse(url="/twa/error?message=Authentication+failed")
 
+        # For non-TWA routes
         return await call_next(request)

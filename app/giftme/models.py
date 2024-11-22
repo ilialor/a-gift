@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy import ARRAY, JSON, ForeignKey, Integer, String, Table, Enum, Text, UniqueConstraint, text, Column, DateTime, BigInteger, PrimaryKeyConstraint
+from sqlalchemy import ARRAY, JSON, ForeignKey, Integer, String, Table, Enum, Text, UniqueConstraint, text, Column, DateTime, BigInteger, PrimaryKeyConstraint, Boolean, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from app.dao.database import Base, uniq_str_an, array_or_none_an
@@ -104,12 +104,14 @@ class Gift(Base):
     )
     
     def to_dict(self) -> dict:
+        total_paid = sum(payment.amount for payment in self.payments)
         return {
             "id": self.id,
             "name": self.name,
             "description": self.description,
             "price": self.price,
             "owner_id": self.owner_id,
+            "paid_amount": total_paid
         }
 
 class Payment(Base):

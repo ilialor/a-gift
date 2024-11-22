@@ -56,3 +56,19 @@ class TWAAuthManager:
             return (exp - now) < self.refresh_threshold
         except JWTError:
             return True
+
+    def refresh_access_token(self, refresh_token):
+        try:
+            payload = jwt.decode(
+                refresh_token, 
+                self.secret_key, 
+                algorithms=['HS256']
+            )
+            user_id = payload.get('sub')
+            if not user_id:
+                raise ValueError('Invalid refresh token')
+            # Create new access token
+            new_access_token = self.create_access_token(user_id)
+            return new_access_token
+        except Exception as e:
+            raise ValueError('Invalid refresh token') from e

@@ -19,6 +19,7 @@ class ProfilePydantic(BaseModel):
 
 
 class UserPydantic(BaseModel):
+    id: int
     username: str
     email: Optional[str] = None 
     profile: Optional[ProfilePydantic] = None

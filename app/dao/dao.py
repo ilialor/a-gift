@@ -208,6 +208,12 @@ class GiftDAO(BaseDAO[Gift]):
             logging.error(f"Error retrieving gift by ID: {e}")
             return None
 
+    async def mark_gift_as_paid(self, gift_id: int):
+        gift = await self.get_gift_by_id(gift_id)
+        gift.is_paid = True
+        self.session.add(gift)
+        await self.session.commit()
+
 class GiftListDAO(BaseDAO[GiftList]):
     model = GiftList
 

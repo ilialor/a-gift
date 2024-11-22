@@ -5,21 +5,22 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 from pydantic import BaseModel, Field
-from app.dao.dao import ContactDAO, GiftDAO, GiftListDAO, UserDAO, UserListDAO
+from app.dao.dao import ContactDAO, GiftDAO, GiftListDAO, PaymentDAO, UserDAO, UserListDAO
 from app.twa.validation import TelegramWebAppValidator
 from app.twa.auth import TWAAuthManager
 from app.dao.session_maker import async_session_maker, connection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Optional
+from typing import List, Optional, Dict
 from app.config import settings
 from app.giftme.models import Gift, User
-from app.giftme.schemas import GiftCreate, GiftListCreate, GiftListResponse, GiftResponse
+from app.giftme.schemas import GiftCreate, GiftListCreate, GiftListResponse, GiftResponse, ProfilePydantic, UserFilterPydantic, UserPydantic
 from app.utils.telegram_client import TelegramContactsService
 from app.service.ContactService import ContactsService 
 from app.utils.bot_instance import telegram_bot
 from telethon import functions, types
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, LoginUrl, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from aiogram import types
 
 router = APIRouter(prefix="/twa", tags=["twa"])
 templates = Jinja2Templates(directory="app/templates")
@@ -110,9 +111,11 @@ async def main_page(
             if not user:
                 return RedirectResponse(url="/twa/error?message=User+not+found")
 
+        bot_info = await telegram_bot.get_me()
         return templates.TemplateResponse("pages/index.html", {
             "request": request,
-            "user": user
+            "user": user,
+            "bot_username": bot_info.username
         })
 
     except Exception as e:
@@ -257,11 +260,15 @@ async def gifts_page(request: Request):
         gift_dao = GiftDAO(session)
         gifts = await gift_dao.get_gifts_by_user_id(user.id)
         
+        # Get bot information for sharing
+        bot_info = await telegram_bot.get_me()
+        
     return templates.TemplateResponse("pages/gifts.html", {
         "request": request,
         "user": user,
         "gifts": gifts,
-        "page_title": "My Gifts"
+        "page_title": "My Gifts",
+        "bot_username": bot_info.username  # Add bot username to context
     })
 
 @router.get("/groups")
@@ -452,7 +459,6 @@ async def get_telegram_contacts(request: Request):
             # Получаем контакты пользователя через Telegram API
             # telegram_contacts = await get_telegram_user_contacts(user.telegram_id)
             
-            # Получаем существующих пользователей с этими Telegram ID
             # user_dao = UserDAO(session)
             # registered_users = await user_dao.get_users_by_telegram_ids(
             #     [contact['id'] for contact in telegram_contacts]
@@ -525,6 +531,239 @@ async def get_saved_contacts(request: Request):
         logging.error(f"Error getting saved contacts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/api/payments/{gift_id}/pay")
+async def initiate_payment(gift_id: int, request: Request):
+    """Initiate Telegram payment for a gift"""
+    try:
+        # Проверяем и логируем данные авторизации
+        logging.info("Payment request headers: %s", dict(request.headers))
+        
+        user = request.state.user
+        if not user:
+            logging.error("No user in request state")
+            raise HTTPException(
+                status_code=401, 
+                detail="Authentication required. Please return to the bot."
+            )
+
+        # Получаем и валидируем параметры
+        payload = await request.json()
+        amount = payload.get('amount')
+        platform = payload.get('platform', 'unknown')
+        
+        logging.info("Payment request: amount=%s, platform=%s, user_id=%s", 
+                    amount, platform, user.id)
+
+        # For web version, create payment URL
+        if "web" in request.headers.get("User-Agent", "").lower():
+            bot_username = (await telegram_bot.get_me()).username
+            payment_url = f"https://t.me/{bot_username}?start=pay_{gift_id}_{amount}"
+            
+            return JSONResponse({
+                "status": "success",
+                "payment_url": payment_url
+            })
+
+        # For mobile version proceed with direct invoice
+        star_amount = max(1, round(float(amount)))
+        amount_in_units = star_amount * 100
+
+        if amount_in_units < 100 or amount_in_units > 500000:
+            raise HTTPException(
+                status_code=400,
+                detail="Amount must be between 1 and 5000 Stars"
+            )
+
+        # Continue with existing invoice creation code...
+        # Get initData from headers or query params
+        init_data = (
+            request.query_params.get('initData') or 
+            request.headers.get('X-Init-Data')
+        )
+        if not init_data:
+            raise HTTPException(
+                status_code=400, 
+                detail="Missing Telegram WebApp data"
+            )
+
+        async with async_session_maker() as session:
+            gift = await GiftDAO(session).get_gift_by_id(gift_id)
+            if not gift:
+                raise HTTPException(status_code=404, detail="Gift not found")
+
+            # Convert price to Stars (minimum 1 Star = 100 units)
+            price_in_dollars = float(gift.price)
+            star_amount = max(1, round(price_in_dollars))  # Round to nearest Star
+            amount_in_units = star_amount * 100  # Convert to smallest currency unit
+
+            # Validate amount limits
+            if amount_in_units < 100:  # Less than 1 Star
+                amount_in_units = 100  # Minimum 1 Star
+            elif amount_in_units > 500000:  # More than 5000 Stars
+                raise HTTPException(
+                    status_code=400,
+                    detail="Price exceeds maximum allowed (5000 Stars)"
+                )
+
+            try:
+                # Prepare invoice data
+                title = f"🎁 {gift.name[:32]}"  # Emoji + limit length 
+                description = (
+                    f"Purchase gift: {gift.name}\n"
+                    f"Price: {star_amount} Stars"
+                )[:255]  # Limit length
+
+                await telegram_bot.send_invoice(
+                    chat_id=user.telegram_id,
+                    title=title,
+                    description=description,
+                    payload=str(gift_id),
+                    provider_token='',  # Empty for Stars
+                    currency='XTR',  # Stars currency code
+                    prices=[types.LabeledPrice(
+                        label=f"Gift: {gift.name[:20]}",  # Shorter label
+                        amount=amount_in_units
+                    )],
+                    start_parameter=f'gift_{gift_id}',
+                    need_shipping_address=False,
+                    is_flexible=False,
+                    protect_content=True
+                )
+                return {"status": "invoice_sent", "amount_stars": star_amount}
+
+            except Exception as e:
+                error_msg = str(e)
+                if "CURRENCY_TOTAL_AMOUNT_INVALID" in error_msg:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid amount ({star_amount} Stars). Must be between 1 and 5000 Stars."
+                    )
+                elif "STARS_INVOICE_INVALID" in error_msg:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Could not create Stars invoice"
+                    )
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Payment error: {error_msg}"
+                )
+
+    except HTTPException as he:
+        logging.error("HTTP Exception in payment: %s", he.detail)
+        raise
+    except Exception as e:
+        logging.error("Error in payment: %s", str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Payment processing error: {str(e)}"
+        )
+
+@router.post("/api/gifts/{gift_id}/payment-callback")
+async def payment_callback(
+    gift_id: int,
+    request: Request
+):
+    """Обработчик callback от Telegram после успешного платежа"""
+    try:
+        payment_data = await request.json()
+        user_id = request.state.user_id
+        
+        async with async_session_maker() as session:
+            # Проверяем существование подарка
+            gift_dao = GiftDAO(session)
+            gift = await gift_dao.get_gift_by_id(gift_id)
+            
+            if not gift:
+                raise HTTPException(status_code=404, detail="Gift not found")
+
+            # Обновляем сумму оплаты
+            payment = {
+                "user_id": user_id,
+                "gift_id": gift_id,
+                "amount": payment_data["amount"],
+                "telegram_payment_charge_id": payment_data["telegram_payment_charge_id"]
+            }
+            
+            payment_dao = PaymentDAO(session)
+            await payment_dao.add_payment(payment)
+
+            return JSONResponse({"status": "success"})
+
+    except Exception as e:
+        logging.error(f"Error processing payment callback: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process payment")
+
+@router.get("/api/bot-info")
+async def get_bot_info():
+    """Get bot information"""
+    try:
+        bot_info = await telegram_bot.get_me()
+        return {"username": bot_info.username}
+    except Exception as e:
+        logging.error(f"Error getting bot info: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get bot information")
+
+class DirectAuthRequest(BaseModel):
+    init_data: str
+    return_url: str
+
+@router.post("/api/auth/direct")
+async def direct_auth(auth_request: DirectAuthRequest):
+    """Direct authentication endpoint for WebApp"""
+    try:
+        if not auth_request.init_data:
+            raise HTTPException(status_code=400, detail="No init_data provided")
+
+        # Validate Telegram WebApp data
+        try:
+            validated_data = telegram_validator.validate_init_data(auth_request.init_data)
+            user_telegram_id = validated_data["user"]["id"]
+            logging.info(f"Validated user_telegram_id: {user_telegram_id}")
+        except Exception as e:
+            logging.error(f"Init data validation error: {e}")
+            raise HTTPException(status_code=400, detail="Invalid init_data")
+        
+        async with async_session_maker() as session:
+            # Find or create user
+            filter_model = UserFilterPydantic(telegram_id=user_telegram_id)
+            user = await UserDAO.find_one_or_none(session=session, filters=filter_model)
+            
+            if not user:
+                # Create new user from Telegram data
+                profile = ProfilePydantic(
+                    first_name=validated_data["user"].get("first_name"),
+                    last_name=validated_data["user"].get("last_name")
+                )
+                values = UserPydantic(
+                    telegram_id=user_telegram_id,
+                    username=validated_data["user"].get("username"),
+                    profile=profile
+                )
+                user = await UserDAO.add(session=session, values=values)
+
+            # Create tokens
+            access_token = auth_manager.create_access_token(user.id)
+            refresh_token = auth_manager.create_refresh_token(user.id)
+            
+            # Update refresh token in database
+            await UserDAO.update_refresh_token(session, user.id, refresh_token)
+            
+            return {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "user": {
+                    "id": user.id,
+                    "username": user.username
+                }
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Direct auth error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/public/gifts/{gift_id}")
 async def public_gift_detail(request: Request, gift_id: int):
     try:
@@ -533,10 +772,39 @@ async def public_gift_detail(request: Request, gift_id: int):
             gift = await gift_dao.get_gift_by_id(gift_id)
             if not gift:
                 raise HTTPException(status_code=404, detail="Gift not found")
+
+            # Get bot information
+            bot_info = await telegram_bot.get_me()
+
+            # Pass 'user' from request state to the template
             return templates.TemplateResponse("pages/gift_detail.html", {
                 "request": request,
-                "gift": gift
+                "gift": gift,
+                "bot_username": bot_info.username,
+                "user": request.state.user  # Add this line
             })
     except Exception as e:
         logging.error(f"Error fetching gift details: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/api/bot-info")
+async def get_bot_info():
+    """Get bot information"""
+    try:
+        bot_info = await telegram_bot.get_me()
+        return {"username": bot_info.username}
+    except Exception as e:
+        logging.error(f"Error getting bot info: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get bot information")
+
+@router.get("/api/auth/validate")
+async def validate_auth(request: Request):
+    """Validate authentication tokens"""
+    try:
+        user_id = request.state.user_id
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        return {"status": "valid"}
+    except Exception as e:
+        logging.error(f"Auth validation error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid authentication")
