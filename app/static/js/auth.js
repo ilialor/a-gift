@@ -184,6 +184,11 @@ AuthManager = {
           platform: typeof window !== 'undefined' ? window.Telegram?.WebApp?.platform || 'web' : 'server',
           botUsername: this.botUsername
       });
+
+      window.Telegram.WebApp.onEvent('payment_success', () => {
+          console.log('Payment successful');
+          window.Telegram.WebApp.close();
+      });
   },
 
   setBotUsername(username) {

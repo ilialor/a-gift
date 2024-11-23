@@ -1,26 +1,23 @@
 import logging
-from fastapi import APIRouter, Request, HTTPException, Depends, Query, status
+from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from app.dao.dao import ContactDAO, GiftDAO, GiftListDAO, PaymentDAO, UserDAO, UserListDAO
 from app.twa.validation import TelegramWebAppValidator
 from app.twa.auth import TWAAuthManager
 from app.dao.session_maker import async_session_maker, connection
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Optional, Dict
+from typing import Optional
 from app.config import settings
-from app.giftme.models import Gift, User
 from app.giftme.schemas import GiftCreate, GiftListCreate, GiftListResponse, GiftResponse, ProfilePydantic, UserFilterPydantic, UserPydantic
 from app.utils.telegram_client import TelegramContactsService
 from app.service.ContactService import ContactsService 
 from app.utils.bot_instance import telegram_bot
-from telethon import functions, types
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, LoginUrl, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telethon import functions
 from aiogram import types
+from aiogram.types import Message
 
 router = APIRouter(prefix="/twa", tags=["twa"])
 templates = Jinja2Templates(directory="app/templates")
@@ -531,132 +528,62 @@ async def get_saved_contacts(request: Request):
         logging.error(f"Error getting saved contacts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.post("/api/payments/{gift_id}/pay")
+@router.post("/api/gifts/{gift_id}/pay")
 async def initiate_payment(gift_id: int, request: Request):
-    """Initiate Telegram payment for a gift"""
+    """Initiate Telegram Stars payment for a gift"""
     try:
-        # Проверяем и логируем данные авторизации
-        logging.info("Payment request headers: %s", dict(request.headers))
-        
         user = request.state.user
         if not user:
-            logging.error("No user in request state")
-            raise HTTPException(
-                status_code=401, 
-                detail="Authentication required. Please return to the bot."
-            )
-
-        # Получаем и валидируем параметры
-        payload = await request.json()
-        amount = payload.get('amount')
-        platform = payload.get('platform', 'unknown')
-        
-        logging.info("Payment request: amount=%s, platform=%s, user_id=%s", 
-                    amount, platform, user.id)
-
-        # For web version, create payment URL
-        if "web" in request.headers.get("User-Agent", "").lower():
-            bot_username = (await telegram_bot.get_me()).username
-            payment_url = f"https://t.me/{bot_username}?start=pay_{gift_id}_{amount}"
-            
-            return JSONResponse({
-                "status": "success",
-                "payment_url": payment_url
-            })
-
-        # For mobile version proceed with direct invoice
-        star_amount = max(1, round(float(amount)))
-        amount_in_units = star_amount * 100
-
-        if amount_in_units < 100 or amount_in_units > 500000:
-            raise HTTPException(
-                status_code=400,
-                detail="Amount must be between 1 and 5000 Stars"
-            )
-
-        # Continue with existing invoice creation code...
-        # Get initData from headers or query params
-        init_data = (
-            request.query_params.get('initData') or 
-            request.headers.get('X-Init-Data')
-        )
-        if not init_data:
-            raise HTTPException(
-                status_code=400, 
-                detail="Missing Telegram WebApp data"
-            )
+            raise HTTPException(status_code=401, detail="Authentication required")
 
         async with async_session_maker() as session:
-            gift = await GiftDAO(session).get_gift_by_id(gift_id)
+            gift_dao = GiftDAO(session)
+            gift = await gift_dao.get_gift_by_id(gift_id)
             if not gift:
                 raise HTTPException(status_code=404, detail="Gift not found")
 
-            # Convert price to Stars (minimum 1 Star = 100 units)
-            price_in_dollars = float(gift.price)
-            star_amount = max(1, round(price_in_dollars))  # Round to nearest Star
-            amount_in_units = star_amount * 100  # Convert to smallest currency unit
+            # Get payment data from request
+            payload = await request.json()
+            amount = float(payload.get('amount', 0))
+            
+            # Convert to Stars
+            stars_amount = max(1, round(amount))
+            amount_in_units = stars_amount * 100  # 1 Star = 100 units
 
-            # Validate amount limits
-            if amount_in_units < 100:  # Less than 1 Star
-                amount_in_units = 100  # Minimum 1 Star
-            elif amount_in_units > 500000:  # More than 5000 Stars
-                raise HTTPException(
-                    status_code=400,
-                    detail="Price exceeds maximum allowed (5000 Stars)"
-                )
-
+            # Create Stars invoice
             try:
-                # Prepare invoice data
-                title = f"🎁 {gift.name[:32]}"  # Emoji + limit length 
-                description = (
-                    f"Purchase gift: {gift.name}\n"
-                    f"Price: {star_amount} Stars"
-                )[:255]  # Limit length
-
-                await telegram_bot.send_invoice(
+                result : Message = await telegram_bot.send_invoice(
                     chat_id=user.telegram_id,
-                    title=title,
-                    description=description,
+                    title=f"🎁 {gift.name}",
+                    description=f"Support gift: {gift.name} ({stars_amount} Stars)",
                     payload=str(gift_id),
-                    provider_token='',  # Empty for Stars
-                    currency='XTR',  # Stars currency code
+                    provider_token="",  # Empty for Telegram Stars
+                    currency="XTR",  # Telegram Stars currency
                     prices=[types.LabeledPrice(
-                        label=f"Gift: {gift.name[:20]}",  # Shorter label
+                        label=f"Gift: {gift.name[:20]}",
                         amount=amount_in_units
                     )],
-                    start_parameter=f'gift_{gift_id}',
+                    start_parameter=f"gift_{gift_id}",
                     need_shipping_address=False,
-                    is_flexible=False,
-                    protect_content=True
+                    is_flexible=False
                 )
-                return {"status": "invoice_sent", "amount_stars": star_amount}
-
+                logging.info(f"Payment invoice sent: {result}")
+                return {"status": "success", "message": "Payment invoice sent"}
+                
             except Exception as e:
-                error_msg = str(e)
-                if "CURRENCY_TOTAL_AMOUNT_INVALID" in error_msg:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Invalid amount ({star_amount} Stars). Must be between 1 and 5000 Stars."
-                    )
-                elif "STARS_INVOICE_INVALID" in error_msg:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Could not create Stars invoice"
-                    )
+                logging.error(f"Error sending Stars invoice: {e}")
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Payment error: {error_msg}"
+                    detail="Failed to create Stars payment"
                 )
 
-    except HTTPException as he:
-        logging.error("HTTP Exception in payment: %s", he.detail)
+    except HTTPException:
         raise
     except Exception as e:
-        logging.error("Error in payment: %s", str(e))
+        logging.error(f"Payment error: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Payment processing error: {str(e)}"
+            detail="Failed to process payment request"
         )
 
 @router.post("/api/gifts/{gift_id}/payment-callback")
@@ -694,15 +621,15 @@ async def payment_callback(
         logging.error(f"Error processing payment callback: {e}")
         raise HTTPException(status_code=500, detail="Failed to process payment")
 
-@router.get("/api/bot-info")
-async def get_bot_info():
-    """Get bot information"""
-    try:
-        bot_info = await telegram_bot.get_me()
-        return {"username": bot_info.username}
-    except Exception as e:
-        logging.error(f"Error getting bot info: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get bot information")
+# @router.get("/api/bot-info")
+# async def get_bot_info():
+#     """Get bot information"""
+#     try:
+#         bot_info = await telegram_bot.get_me()
+#         return {"username": bot_info.username}
+#     except Exception as e:
+#         logging.error(f"Error getting bot info: {e}")
+#         raise HTTPException(status_code=500, detail="Failed to get bot information")
 
 class DirectAuthRequest(BaseModel):
     init_data: str

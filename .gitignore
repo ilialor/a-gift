@@ -21,3 +21,4 @@ app/static/meta/*
 app/static/main_page1.png
 app/static/.jshintrc
 app/static/js/GroupList.js
+app/static/js/global.d.ts

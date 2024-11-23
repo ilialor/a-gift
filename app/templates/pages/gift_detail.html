@@ -146,7 +146,6 @@
         const loadingUtils = {
             show() {
                 document.body.style.cursor = 'wait';
-                // Опционально добавить спиннер или другой индикатор
                 const buttons = document.querySelectorAll('button');
                 buttons.forEach(btn => btn.disabled = true);
             },
@@ -207,7 +206,8 @@
                         },
                         body: JSON.stringify({ 
                             amount: amount,
-                            platform: window.Telegram?.WebApp?.platform || 'web'
+                            // Улучшаем определение платформы
+                            platform: window.Telegram?.WebApp ? 'webapp' : 'web'
                         })
                     }
                 );
@@ -218,9 +218,13 @@
                     throw new Error(data.detail || 'Payment failed');
                 }
                 
-                // Открываем URL оплаты в новом окне
+                // Открываем URL оплаты в новом окне или непосредственно в WebApp
                 if (data.payment_url) {
-                    window.open(data.payment_url, '_blank');
+                    if (window.Telegram?.WebApp) {
+                        window.Telegram.WebApp.openLink(data.payment_url, true);
+                    } else {
+                        window.open(data.payment_url, '_blank');
+                    }
                 } else {
                     throw new Error('Invalid payment URL received');
                 }
