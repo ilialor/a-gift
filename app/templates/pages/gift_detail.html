@@ -218,16 +218,9 @@
                     throw new Error(data.detail || 'Payment failed');
                 }
                 
-                // Открываем URL оплаты в новом окне или непосредственно в WebApp
-                if (data.payment_url) {
-                    if (window.Telegram?.WebApp) {
-                        window.Telegram.WebApp.openLink(data.payment_url, true);
-                    } else {
-                        window.open(data.payment_url, '_blank');
-                    }
-                } else {
-                    throw new Error('Invalid payment URL received');
-                }
+                // Remove the check for data.payment_url
+                // and show a success message to the user
+                loadingUtils.showMessage('Payment request sent. Check your Telegram messages.');
 
             } catch (error) {
                 console.error('Payment error:', error);

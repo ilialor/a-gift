@@ -528,22 +528,29 @@ async def get_saved_contacts(request: Request):
         logging.error(f"Error getting saved contacts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/api/gifts/{gift_id}/pay")
+@router.post("/api/payments/{gift_id}/pay")
 async def initiate_payment(gift_id: int, request: Request):
     """Initiate Telegram Stars payment for a gift"""
     try:
         user = request.state.user
         if not user:
+            logging.error("User not found")
             raise HTTPException(status_code=401, detail="Authentication required")
 
         async with async_session_maker() as session:
             gift_dao = GiftDAO(session)
             gift = await gift_dao.get_gift_by_id(gift_id)
             if not gift:
+                logging.error(f"Gift {gift_id} not found")
                 raise HTTPException(status_code=404, detail="Gift not found")
 
             # Get payment data from request
-            payload = await request.json()
+            try:
+                payload = await request.json()
+            except Exception as e:
+                logging.error(f"Invalid JSON in request body: {e}")
+                raise HTTPException(status_code=400, detail="Invalid JSON in request body")
+
             amount = float(payload.get('amount', 0))
             
             # Convert to Stars

@@ -96,16 +96,23 @@ AuthManager = {
           throw new Error('Authentication required');
       }
 
+      const existingHeaders = options.headers || {};
+
       const headers = {
-          ...options.headers,
+          ...existingHeaders,
           'X-Start-Param': authData.startParam,
           'X-Refresh-Token': authData.refresh_token,
           'X-Init-Data': authData.initData || ''
       };
 
-      try {
-          const response = await fetch(url, { ...options, headers });
+      const finalOptions = {
+          ...options,
+          headers
+      };
 
+      try {
+          const response = await fetch(url, finalOptions);
+          console.log('Fetch response:', response);
           // Handle token refresh
           const newAccessToken = response.headers.get('X-New-Access-Token');
           if (newAccessToken) {
@@ -140,8 +147,10 @@ AuthManager = {
                           throw new Error('Authentication required. Please return to the bot.');
                       }
                   }
+                  console.error('Session expired. Please reauthorize through the bot.');
                   throw new Error('Session expired. Please reauthorize through the bot.');
               }
+              console.error('Request failed:', response.statusText);
               throw new Error(response.statusText || 'Request failed');
           }
 

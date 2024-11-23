@@ -265,7 +265,7 @@
                   if (window.Telegram?.WebApp) {
                       window.Telegram.WebApp.showAlert('Payment request sent. Check your Telegram messages.');
                   } else {
-                      alert('Payment request sent');
+                      alert('Payment request sent. Check your Telegram messages.');
                   }
               } else {
                   throw new Error(data.detail || 'Failed to initiate payment');
