@@ -1,8 +1,9 @@
 from aiogram import types, Router, F
-from aiogram.types import LabeledPrice, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from app.dao.dao import GiftDAO, PaymentDAO
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from app.dao.dao import GiftDAO, PaymentDAO, UserDAO
 from app.dao.session_maker import async_session_maker
 from app.config import settings
+from app.giftme.schemas import PaymentCreate, UserFilterPydantic  
 import logging
 
 router = Router()
@@ -23,22 +24,38 @@ async def process_pre_checkout_query(pre_checkout_query: types.PreCheckoutQuery)
 @router.message(F.successful_payment)
 async def process_successful_payment(message: types.Message):
     """Handle successful Stars payment"""
+    logging.info(f"Received successful payment: {message}")
     try:
+        if not message.successful_payment:
+            logging.error("No successful_payment data in message")
+            return
         payment_info = message.successful_payment
         gift_id = int(payment_info.invoice_payload)
-        stars_amount = payment_info.total_amount / 100  # Convert to Stars
+        stars_amount = payment_info.total_amount 
         
         async with async_session_maker() as session:
-            # Save payment record
-            payment_dao = PaymentDAO(session)
-            payment = {
-                "user_id": message.from_user.id,
-                "gift_id": gift_id,
-                "amount": stars_amount,
-                "telegram_payment_charge_id": payment_info.telegram_payment_charge_id,
-                "provider_payment_charge_id": payment_info.provider_payment_charge_id
-            }
-            await payment_dao.add_payment(payment)
+            # Retrieve the user from the database using telegram_id
+            user = await UserDAO.find_one_or_none(session=session, filters=UserFilterPydantic(telegram_id=message.from_user.id))
+            if not user:
+                logging.error(f"Error when saving payment: User {message.from_user.id} not found in the database")
+                raise Exception("User not found in the database")
+            
+            # Save payment record with the client's DB id
+            logging.info(f"Payment received for user {user.id} for gift {gift_id} with amount {stars_amount}")
+            logging.info(f"message.successful_payment data: {payment_info}")
+
+            if payment_info:
+                payment_charge_id = payment_info.telegram_payment_charge_id
+            else:
+                payment_charge_id = ""
+
+            payment_data = PaymentCreate(
+                user_id=user.id,  # Use the client's DB id
+                gift_id=gift_id,
+                amount=stars_amount,
+                telegram_payment_charge_id=payment_charge_id
+            )
+            await PaymentDAO.add_payment(session, payment_data)
             
             # Get gift details
             gift = await GiftDAO(session).get_gift_by_id(gift_id)

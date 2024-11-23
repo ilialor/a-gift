@@ -11,7 +11,7 @@ from app.dao.session_maker import async_session_maker, connection
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Optional
 from app.config import settings
-from app.giftme.schemas import GiftCreate, GiftListCreate, GiftListResponse, GiftResponse, ProfilePydantic, UserFilterPydantic, UserPydantic
+from app.giftme.schemas import GiftCreate, GiftListCreate, GiftListResponse, GiftResponse, PaymentCreate, ProfilePydantic, UserFilterPydantic, UserPydantic
 from app.utils.telegram_client import TelegramContactsService
 from app.service.ContactService import ContactsService 
 from app.utils.bot_instance import telegram_bot
@@ -555,11 +555,11 @@ async def initiate_payment(gift_id: int, request: Request):
             
             # Convert to Stars
             stars_amount = max(1, round(amount))
-            amount_in_units = stars_amount * 100  # 1 Star = 100 units
+            amount_in_units = stars_amount 
 
             # Create Stars invoice
             try:
-                result : Message = await telegram_bot.send_invoice(
+                result: Message = await telegram_bot.send_invoice(
                     chat_id=user.telegram_id,
                     title=f"🎁 {gift.name}",
                     description=f"Support gift: {gift.name} ({stars_amount} Stars)",
@@ -574,9 +574,10 @@ async def initiate_payment(gift_id: int, request: Request):
                     need_shipping_address=False,
                     is_flexible=False
                 )
-                logging.info(f"Payment invoice sent: {result}")
-                return {"status": "success", "message": "Payment invoice sent"}
+                logging.info(f"Payment invoice sent: {result.message_id}")
+                # TODO Check could invoice should be saved in database
                 
+                return {"status": "success", "message": "Payment invoice sent"}
             except Exception as e:
                 logging.error(f"Error sending Stars invoice: {e}")
                 raise HTTPException(

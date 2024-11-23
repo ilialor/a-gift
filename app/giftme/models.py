@@ -115,12 +115,13 @@ class Gift(Base):
         }
 
 class Payment(Base):
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey('users.id'), nullable=False)
     amount: Mapped[float]
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
     user: Mapped['User'] = relationship('User', back_populates='payments')
     gift_id: Mapped[int] = mapped_column(ForeignKey('gifts.id'), nullable=False)
     gift: Mapped['Gift'] = relationship('Gift', back_populates='payments')
+    telegram_payment_charge_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
 # Association table for GiftList and Gift
 gift_list_gift = Table(

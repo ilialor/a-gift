@@ -58,12 +58,13 @@ class TelegramWebAppMiddleware(BaseHTTPMiddleware):
 
                             # Create user if not exists
                             if not user:
-                                from app.giftme.schemas import UserPydantic, ProfilePydantic
+                                from app.giftme.schemas import UserCreate, ProfilePydantic
                                 profile = ProfilePydantic(
                                     first_name=validated_data["user"].get("first_name"),
                                     last_name=validated_data["user"].get("last_name")
                                 )
-                                values = UserPydantic(
+
+                                values = UserCreate(
                                     telegram_id=user_telegram_id,
                                     username=validated_data["user"].get("username"),
                                     profile=profile

@@ -17,6 +17,21 @@ class ProfilePydantic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
+class PaymentCreate(BaseModel):
+    user_id: int
+    gift_id: int
+    amount: float
+    telegram_payment_charge_id: str
+
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+
+class UserCreate(BaseModel):
+    username: str
+    email: Optional[str] = None 
+    profile: Optional[ProfilePydantic] = None
+    telegram_id: int  
+
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 class UserPydantic(BaseModel):
     id: int

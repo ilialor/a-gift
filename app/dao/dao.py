@@ -1,12 +1,12 @@
 import logging
 from typing import Optional, List
-from sqlalchemy import select, func, update as sa_update, and_
+from sqlalchemy import select, func, update as sa_update, and_, BigInteger
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from app.dao.base import BaseDAO
 from app.giftme.models import Contact, Gift, GiftList, Payment, User, Profile, UserList
-from app.giftme.schemas import UserFilterPydantic, UserPydantic
+from app.giftme.schemas import PaymentCreate, UserCreate, UserFilterPydantic, UserPydantic
 
 
 class UserDAO(BaseDAO[User]):
@@ -80,7 +80,7 @@ class UserDAO(BaseDAO[User]):
         return records  # Возвращаем список записей
 
     @staticmethod
-    async def add(session: AsyncSession, values: UserPydantic) -> UserPydantic:
+    async def add(session: AsyncSession, values: UserCreate) -> UserPydantic:
         user = User(
             telegram_id=values.telegram_id,
             username=values.username,
@@ -157,6 +157,17 @@ class ProfileDAO(BaseDAO[Profile]):
 
 class PaymentDAO(BaseDAO[Payment]):
     model = Payment
+
+    async def add_payment(self, payment: PaymentCreate):
+        new_payment = Payment(
+            user_id=payment.user_id,  
+            gift_id=payment.gift_id,
+            amount=payment.amount,
+            telegram_payment_charge_id=payment.telegram_payment_charge_id
+        )
+        self.session.add(new_payment)
+        await self.session.commit()
+        return new_payment
 
 
 class GiftDAO(BaseDAO[Gift]):
