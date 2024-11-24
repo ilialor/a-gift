@@ -16,7 +16,8 @@ target_metadata = Base.metadata
 
 from app.giftme.models import (
     User, Profile, GiftList, UserList, Gift, Payment,
-    EventTypeEnum, RecurrenceTypeEnum, Calendar, calendar_participants
+    EventTypeEnum, RecurrenceTypeEnum, Calendar, calendar_participants,
+    Contact
 )
 
 # other values from the config, defined by the needs of env.py,

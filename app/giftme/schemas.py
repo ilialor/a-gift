@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserFilterPydantic(BaseModel):
@@ -17,8 +17,24 @@ class ProfilePydantic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
+class PaymentCreate(BaseModel):
+    user_id: int
+    gift_id: int
+    amount: float
+    telegram_payment_charge_id: str
+
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+
+class UserCreate(BaseModel):
+    username: str
+    email: Optional[str] = None 
+    profile: Optional[ProfilePydantic] = None
+    telegram_id: int  
+
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 class UserPydantic(BaseModel):
+    id: int
     username: str
     email: Optional[str] = None 
     profile: Optional[ProfilePydantic] = None
@@ -33,15 +49,13 @@ class UsernameIdPydantic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class GiftCreate(BaseModel):
-    name: str
-    description: str
-    price: float
+    name: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
+    price: float = Field(..., gt=0)
     owner_id: int
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
-
 
 class GiftUpdate(BaseModel):
     name: Optional[str] = None
@@ -49,7 +63,6 @@ class GiftUpdate(BaseModel):
     price: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
-
 
 class GiftResponse(BaseModel):
     id: int
@@ -60,8 +73,14 @@ class GiftResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
-
 class GiftListCreate(BaseModel):
+    name: str = Field(..., min_length=1)
+    owner_id: int
+
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+
+class GiftListResponse(BaseModel):
+    id: int
     name: str
     owner_id: int
 
@@ -73,15 +92,6 @@ class GiftListUpdate(BaseModel):
     owner_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
-
-
-class GiftListResponse(BaseModel):
-    id: int
-    name: str
-    owner_id: int
-
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
-
 
 class UserListCreate(BaseModel):
     user_id: int

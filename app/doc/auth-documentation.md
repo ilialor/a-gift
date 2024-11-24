@@ -2,49 +2,35 @@
 
 ## Overview
 
-This authentication system is designed for Telegram Mini Apps (TWA), providing seamless user experience while maintaining security through JWT tokens and Telegram's built-in authentication mechanisms.
+This authentication system is designed for Telegram Mini Apps (TWA), providing a seamless user experience while maintaining security through JWT tokens and Telegram's built-in authentication mechanisms.
 
 ## Authentication Flow
 
 1. **Initial Authentication (Bot Side)**
 
-   ```
-   User -> Telegram Bot -> TWA
-   ```
-
-   - User starts the bot (/start command)
-   - Bot creates/retrieves user record in database
-   - Bot generates JWT `access_token` and `refresh_token` with `user_id`
-   - Bot provides WebApp button with tokens in `startParam`
+   - User starts the bot (`/start` command).
+   - Bot creates/retrieves user record in the database.
+   - Bot generates JWT `access_token` and `refresh_token` with `user_id`.
+   - Bot provides a `LoginUrl` button with tokens in query parameters.
 
 2. **WebApp Authentication Flow**
 
-   ```
-   TWA -> Middleware -> Protected Routes
-   ```
-
-   - TWA receives `initData` from Telegram
-   - TWA receives `startParam` with `access_token`
-   - Middleware validates both parameters
-   - User gains access to protected routes
+   - When the user clicks the Login button, Telegram sends authorization data to the specified `LoginUrl`.
+   - TWA receives `startParam` (access_token) and `refresh_token` via query parameters.
+   - Backend validates the tokens and authenticates the user.
+   - User gains access to protected routes.
 
 3. **Token Refresh Flow**
 
-   ```
-   TWA -> /auth/refresh -> Middleware -> Update Tokens
-   ```
-
-   - When `access_token` is about to expire or has expired, TWA automatically sends `refresh_token` to `/auth/refresh`
-   - Server validates `refresh_token` and issues new `access_token` and `refresh_token`
-   - Tokens are updated in the client’s `localStorage`
+   - When `access_token` is about to expire or has expired, TWA automatically sends `refresh_token` to `/auth/refresh`.
+   - Server validates `refresh_token` and issues new `access_token` and `refresh_token`.
+   - Tokens are updated in the client’s `localStorage`.
 
 4. **Navigation Authentication**
-   ```
-   Page A -> localStorage -> Page B
-   ```
-   - Auth parameters stored in `localStorage` on first load
-   - Parameters automatically added to internal navigation
-   - Seamless authentication maintained between pages
+
+   - Auth parameters stored in `localStorage` on first load.
+   - Parameters automatically added to internal navigation.
+   - Seamless authentication maintained between pages.
 
 ## Data Structures
 

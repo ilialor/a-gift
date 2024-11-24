@@ -1,11 +1,12 @@
-from typing import Optional
-from sqlalchemy import select, func, update as sa_update
+import logging
+from typing import Optional, List
+from sqlalchemy import select, func, update as sa_update, and_, BigInteger
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from app.dao.base import BaseDAO
-from app.giftme.models import Gift, GiftList, Payment, User, Profile, UserList
-from app.giftme.schemas import UserFilterPydantic, UserPydantic
+from app.giftme.models import Contact, Gift, GiftList, Payment, User, Profile, UserList
+from app.giftme.schemas import PaymentCreate, UserCreate, UserFilterPydantic, UserPydantic
 
 
 class UserDAO(BaseDAO[User]):
@@ -15,7 +16,6 @@ class UserDAO(BaseDAO[User]):
     async def find_one_or_none(session: AsyncSession, filters: UserFilterPydantic) -> Optional[User]:
         result = await session.execute(select(User).filter_by(**filters.dict()))
         user = result.scalars().first()
-        # logging.info(f"UserDAO.find_one_or_none found user: {user.to_dict() if user else 'None'}")
         return user
 
     @classmethod
@@ -63,19 +63,11 @@ class UserDAO(BaseDAO[User]):
 
         return user  # Возвращаем объект пользователя
 
-    @classmethod
-    async def get_all_users(cls, session: AsyncSession):
-        # Создаем запрос для выборки всех пользователей
-        query = select(cls.model)
-
-        # Выполняем запрос и получаем результат
-        result = await session.execute(query)
-
-        # Извлекаем записи как объекты модели
-        records = result.scalars().all()
-
-        # Возвращаем список всех пользователей
-        return records
+    async def get_all_users(self) -> List[User]:
+        """Get all users"""
+        query = select(self.model)
+        result = await self.session.execute(query)
+        return result.scalars().all()
 
     @classmethod
     async def get_username_id(cls, session: AsyncSession):
@@ -87,7 +79,7 @@ class UserDAO(BaseDAO[User]):
         return records  # Возвращаем список записей
 
     @staticmethod
-    async def add(session: AsyncSession, values: UserPydantic) -> UserPydantic:
+    async def add(session: AsyncSession, values: UserCreate) -> UserPydantic:
         user = User(
             telegram_id=values.telegram_id,
             username=values.username,
@@ -149,12 +141,32 @@ class UserDAO(BaseDAO[User]):
         )
         await session.commit()
 
+    async def get_user_by_id(self, user_id: int) -> Optional[User]:
+        return await self.session.get(User, user_id)
+
+    async def get_users_by_telegram_ids(self, telegram_ids: List[int]) -> List[User]:
+        """Get users by their Telegram IDs"""
+        query = select(self.model).where(self.model.telegram_id.in_(telegram_ids))
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
 class ProfileDAO(BaseDAO[Profile]):
     model = Profile
 
 
 class PaymentDAO(BaseDAO[Payment]):
     model = Payment
+
+    async def add_payment(self, payment: PaymentCreate):
+        new_payment = Payment(
+            user_id=payment.user_id,  
+            gift_id=payment.gift_id,
+            amount=payment.amount,
+            telegram_payment_charge_id=payment.telegram_payment_charge_id
+        )
+        self.session.add(new_payment)
+        await self.session.commit()
+        return new_payment
 
 
 class GiftDAO(BaseDAO[Gift]):
@@ -177,6 +189,40 @@ class GiftDAO(BaseDAO[Gift]):
             await self.session.delete(gift)
             await self.session.commit()
 
+    async def get_gifts_by_user_id(self, user_id: int) -> List[Gift]:
+        stmt = select(self.model).where(self.model.owner_id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()  # Return a list of gifts       
+
+    async def get_gift_with_lists(self, gift_id: int, session: AsyncSession):
+        """Get a gift with its associated lists"""
+        try:
+            query = (
+                select(self.model)
+                .options(selectinload(self.model.lists))
+                .where(self.model.id == gift_id)
+            )
+            result = await session.execute(query)
+            return result.scalar_one_or_none()
+        except SQLAlchemyError as e:
+            logging.error(f"Error getting gift with lists: {e}")
+            raise
+
+    async def get_gift_by_id(self, gift_id: int) -> Optional[Gift]:
+        """Retrieve a gift by its ID"""
+        try:
+            stmt = select(self.model).where(self.model.id == gift_id)
+            result = await self.session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logging.error(f"Error retrieving gift by ID: {e}")
+            return None
+
+    async def mark_gift_as_paid(self, gift_id: int):
+        gift = await self.get_gift_by_id(gift_id)
+        gift.is_paid = True
+        self.session.add(gift)
+        await self.session.commit()
 
 class GiftListDAO(BaseDAO[GiftList]):
     model = GiftList
@@ -193,10 +239,81 @@ class GiftListDAO(BaseDAO[GiftList]):
             await self.session.delete(gift_list)
             await self.session.commit()
 
+    async def add_gift_to_list(self, list_id: int, gift_id: int) -> bool:
+        """Add a gift to a gift list"""
+        try:
+            gift_list = await self.session.get(self.model, list_id)
+            gift = await self.session.get(Gift, gift_id)
+            
+            if not gift_list or not gift:
+                return False
+                
+            if gift not in gift_list.gifts:
+                gift_list.gifts.append(gift)
+                await self.session.commit()
+            return True
+        except Exception as e:
+            logging.error(f"Error adding gift to list: {e}")
+            await self.session.rollback()
+            return False
+
+    async def remove_gift_from_list(self, list_id: int, gift_id: int) -> bool:
+        """Remove a gift from a gift list"""
+        try:
+            gift_list = await self.session.get(self.model, list_id)
+            gift = await self.session.get(Gift, gift_id)
+            
+            if not gift_list or not gift:
+                return False
+                
+            if gift in gift_list.gifts:
+                gift_list.gifts.remove(gift)
+                await self.session.commit()
+            return True
+        except Exception as e:
+            logging.error(f"Error removing gift from list: {e}")
+            await self.session.rollback()
+            return False
+        
+    async def get_giftlists_with_gifts(self, owner_id: int):
+        """Get all gift lists with their associated gifts for a specific owner"""
+        try:
+            query = (
+                select(self.model)
+                .options(
+                    selectinload(self.model.gifts)
+                )
+                .where(self.model.owner_id == owner_id)
+            )
+            result = await self.session.execute(query)
+            return result.scalars().all()
+        except SQLAlchemyError as e:
+            logging.error(f"Error getting gift lists with gifts: {e}")
+            raise
+
 
 class UserListDAO(BaseDAO[UserList]):
     model = UserList
 
+    async def create_user_list(self, user_list_data: dict) -> UserList:
+        """Create a new user list with just name and user_id"""
+        try:
+            user_list = self.model(
+                name=user_list_data["name"],
+                user_id=user_list_data["user_id"]
+                # description=user_list_data.get("description"),  # Optional
+                # gift_list_id=user_list_data.get("gift_list_id"),  # Optional
+                # added_user_id=user_list_data.get("added_user_id")  # Optional
+            )
+            self.session.add(user_list)
+            await self.session.commit()
+            await self.session.refresh(user_list)
+            return user_list
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+            logging.error(f"Error creating user list: {e}")
+            raise
+    
     async def add_user_to_list(self, user_list_data: dict) -> Optional[dict]:
         """
         Adds a user to a user list with name and description using ORM.
@@ -263,3 +380,99 @@ class UserListDAO(BaseDAO[UserList]):
         Retrieves a UserList by its ID.
         """
         return await self.find_one_or_none_by_id(user_list_id, self.session)
+
+    async def get_user_lists(self, user_id: int) -> List[UserList]:
+        """Get all user lists where user is owner"""
+        try:
+            query = (
+                select(self.model)
+                .where(self.model.user_id == user_id)
+                .options(
+                    selectinload(self.model.added_user),
+                )
+            )
+            result = await self.session.execute(query)
+            return result.scalars().all()
+        except SQLAlchemyError as e:
+            logging.error(f"Error getting user lists: {e}")
+            raise
+
+    async def toggle_member(self, list_id: int, is_active: bool) -> bool:
+        """Toggle member status in the list"""
+        try:
+            user_list = await self.session.get(self.model, list_id)
+            if user_list:
+                user_list.description = 'active' if is_active else 'inactive'
+                await self.session.commit()
+                return True
+            return False
+        except SQLAlchemyError as e:
+            logging.error(f"Error toggling member status: {e}")
+            await self.session.rollback()
+            return False
+
+class ContactDAO(BaseDAO[Contact]):
+    model = Contact
+
+    async def get_user_contacts(self, user_id: int) -> List[Contact]:
+        """Get user's contacts"""
+        try:
+            query = (
+                select(self.model)
+                .where(self.model.user_id == user_id)
+                .options(selectinload(self.model.user))
+            )
+            result = await self.session.execute(query)
+            return result.scalars().all()
+        except SQLAlchemyError as e:
+            logging.error(f"Error getting user contacts: {e}")
+            raise
+
+    async def add_contact(self, contact_data: dict) -> Optional[Contact]:
+        """Add a new contact"""
+        try:
+            contact = self.model(**contact_data)
+            self.session.add(contact)
+            await self.session.commit()
+            await self.session.refresh(contact)
+            return contact
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+            logging.error(f"Error adding contact: {e}")
+            raise
+
+    async def remove_contact(self, user_id: int, contact_id: int) -> bool:
+        """Remove contact if it belongs to user"""
+        try:
+            contact = await self.session.get(self.model, contact_id)
+            if contact and contact.user_id == user_id:
+                await self.session.delete(contact)
+                await self.session.commit()
+                return True
+            return False
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+            logging.error(f"Error removing contact: {e}")
+            raise
+
+    async def get_contact_by_telegram_id(self, user_id: int, telegram_id: int) -> Optional[Contact]:
+        """
+        Найти контакт по Telegram ID
+        
+        Args:
+            user_id: ID пользователя, которому принадлежит контакт
+            telegram_id: Telegram ID искомого контакта
+        """
+        try:
+            result = await self.session.execute(
+                select(self.model).where(
+                    and_(
+                        self.model.user_id == user_id,
+                        self.model.contact_telegram_id == telegram_id
+                    )
+                )
+            )
+            return result.scalar_one_or_none()
+        except SQLAlchemyError as e:
+            logging.error(f"Error getting contact by telegram_id: {e}")
+            raise

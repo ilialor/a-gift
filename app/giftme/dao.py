@@ -1,9 +1,11 @@
+from typing import List, Optional
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from app.giftme.models import User, Profile, Gift, Payment, GiftList, UserList
+import logging
 
 
 class BaseDAO:
@@ -48,18 +50,40 @@ class UserDAO(BaseDAO):
 class ProfileDAO(BaseDAO):
     model = Profile
 
-
-class GiftDAO(BaseDAO):
+class GiftDAO(BaseDAO[Gift]):
     model = Gift
 
-    @classmethod
-    async def get_gifts_by_owner(cls, session: AsyncSession, owner_id: int):
+    async def create_gift(self, gift_data: dict) -> Gift:
+        """Create a new gift"""
         try:
-            query = select(cls.model).where(cls.model.owner_id == owner_id)
-            result = await session.execute(query)
-            return result.scalars().all()
-        except SQLAlchemyError:
+            logging.info(f"Creating gift with data: {gift_data}")
+            gift = Gift(**gift_data)
+            self.session.add(gift)
+            await self.session.commit()
+            await self.session.refresh(gift)
+            logging.info(f"Created gift with id: {gift.id}")
+            return gift
+        except Exception as e:
+            logging.error(f"Error creating gift: {e}")
+            await self.session.rollback()
             raise
+
+    async def get_gift_by_name(self, name: str) -> Optional[Gift]:
+        stmt = select(self.model).where(self.model.name == name)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def delete_gift(self, gift_id: int):
+        gift = await self.session.get(self.model, gift_id)
+        if gift:
+            await self.session.delete(gift)
+            await self.session.commit()
+
+    async def get_gifts_by_user_id(self, user_id: int) -> List[Gift]:
+        stmt = select(self.model).where(self.model.owner_id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+    
 
 
 class PaymentDAO(BaseDAO):

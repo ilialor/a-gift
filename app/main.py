@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager
 from app.bot.create_bot import bot, dp, stop_bot, start_bot
 from app.bot.handlers.router import router as bot_router
 from app.config import settings
-from app.giftme.router import router as game_router
+from app.dao.dao import GiftDAO
+from app.giftme.router import router as giftme_router
 from app.twa.router import router as twa_router
 from fastapi.staticfiles import StaticFiles
 from aiogram.types import Update
@@ -49,14 +50,12 @@ app.add_middleware(
 )
 
 # Include routers after adding middleware
-app.include_router(game_router)
-logging.info("app/main.py: Included game_router")
+app.include_router(giftme_router)
 app.include_router(twa_router)
-logging.info("app/main.py: Included twa_router")
 
 async def log_requests(request: Request, call_next):
     logging.info(f"Incoming request: method={request.method}, url={request.url}")
-    logging.info(f"Request headers: {dict(request.headers)}")
+    # logging.info(f"Request headers: {dict(request.headers)}")
     response = await call_next(request)
     logging.info(f"Response status: {response.status_code}")
     return response

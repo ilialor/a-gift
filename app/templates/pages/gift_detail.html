@@ -1,0 +1,238 @@
+{% extends "base.html" %} {% block title %}GiftMe - {{ gift.name }}{% endblock
+%} {% block content %}
+
+<div class="header">
+  <div class="profile-section">
+    <a href="/twa/" class="nav-button">←</a>
+    <div class="profile-pic"></div>
+    <div>{% if user %}{{ user.username }}{% else %}Guest{% endif %}</div>
+  </div>
+</div>
+
+<div class="p-4" role="main">
+  <div class="bg-teal-900 bg-opacity-20 rounded-xl p-4 backdrop-blur-sm">
+    <h1 class="text-2xl font-bold mb-4">{{ gift.name }}</h1>
+
+    <div class="mb-4">
+      <p class="text-gray-300">{{ gift.description }}</p>
+      <p class="text-teal-300 mt-2">Price: {{ gift.price }} XTR</p>
+      <p class="text-gray-400">Already paid: {{ gift.paid_amount or 0 }} XTR</p>
+    </div>
+
+    {% if user %}
+    <div class="space-y-4">
+      <div class="flex flex-wrap gap-2" id="percentage-buttons">
+        <button
+          onclick="handlePayment(25)"
+          class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+        >
+          Pay 25%
+        </button>
+        <button
+          onclick="handlePayment(50)"
+          class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+        >
+          Pay 50%
+        </button>
+        <button
+          onclick="handlePayment(75)"
+          class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+        >
+          Pay 75%
+        </button>
+        <button
+          onclick="handlePayment(100)"
+          class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+        >
+          Pay 100%
+        </button>
+      </div>
+
+      <div class="flex gap-2">
+        <input
+          type="number"
+          id="custom-amount"
+          min="0"
+          max="{{ gift.price - (gift.paid_amount or 0) }}"
+          step="0.01"
+          class="flex-1 p-2 rounded bg-white bg-opacity-10 border border-teal-500 text-white"
+          placeholder="Enter amount in XTR"
+        />
+        <button
+          onclick="handleCustomPayment()"
+          class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+        >
+          Pay Custom Amount
+        </button>
+      </div>
+    </div>
+    {% else %}
+    <div class="text-center">
+      <p>Please authenticate to proceed with payment.</p>
+      <button
+        onclick="redirectToAuth()"
+        class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 mt-4"
+      >
+        Authenticate
+      </button>
+      <div id="telegram-link" class="hidden mt-4">
+        <p class="mb-2">Please open this page in Telegram:</p>
+        <a href="#" class="text-teal-400 hover:text-teal-300">
+          Open in Telegram
+        </a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %} {% block extra_scripts %}
+<script>
+    // Define 'redirectToAuth' in the global scope
+    async function redirectToAuth() {
+        try {
+            if (!window.Telegram?.WebApp) {
+                // Показываем ссылку на Telegram если не в WebApp
+                const telegramLink = document.getElementById('telegram-link');
+                const link = telegramLink.querySelector('a');
+                const botUsername = '{{ bot_username }}';
+                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                link.href = `https://t.me/${botUsername}/start?startapp=${returnUrl}`;
+                telegramLink.classList.remove('hidden');
+                return;
+            }
+
+            // Проверяем наличие initData
+            if (!window.Telegram.WebApp.initData) {
+                throw new Error('No Telegram WebApp data available');
+            }
+
+            await AuthManager.directAuth();
+            window.location.reload();
+        } catch (error) {
+            console.error('Auth error:', error);
+            alert('Authentication failed. Please try again or open this link in Telegram.');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Инициализация AuthManager и проверка авторизации
+        const botUsername = '{{ bot_username }}';
+        if (typeof AuthManager.setBotUsername === 'function') {
+            AuthManager.setBotUsername(botUsername);
+        }
+
+        // Проверка авторизации при загрузке
+        const checkAuth = async () => {
+            const authData = AuthManager.getParams();
+            if (!authData) {
+                // Сохраняем текущий URL для возврата
+                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                alert('Authentication required. Redirecting to bot...');
+                window.location.href = `https://t.me/${botUsername}?start=auth_${returnUrl}`;
+                return false;
+            }
+            return true;
+        };
+
+        const totalPrice = {{ gift.price }};
+        const paidAmount = {{ gift.paid_amount or 0 }};
+        const remainingAmount = totalPrice - paidAmount;
+
+        // Проверяем авторизацию сразу
+        checkAuth();
+
+        // Глобальные утилиты для индикации загрузки
+        const loadingUtils = {
+            show() {
+                document.body.style.cursor = 'wait';
+                const buttons = document.querySelectorAll('button');
+                buttons.forEach(btn => btn.disabled = true);
+            },
+            hide() {
+                document.body.style.cursor = 'default';
+                const buttons = document.querySelectorAll('button');
+                buttons.forEach(btn => btn.disabled = false);
+            },
+            showMessage(message) {
+                alert(message);
+            }
+        };
+
+        async function handlePayment(percentage) {
+            const amount = (remainingAmount * percentage) / 100;
+            await createPayment(amount);
+        }
+
+        async function handleCustomPayment() {
+            const input = document.getElementById('custom-amount');
+            const amount = parseFloat(input.value);
+
+            if (amount > 0 && amount <= remainingAmount) {
+                await createPayment(amount);
+            } else {
+                loadingUtils.showMessage('Invalid amount. Please enter a value between 0 and ' + remainingAmount + ' XTR');
+            }
+        }
+
+        async function createPayment(amount) {
+            try {
+                // Повторная проверка авторизации перед платежом
+                if (!await checkAuth()) {
+                    return;
+                }
+                // Define authData here
+                const authData = AuthManager.getParams();
+
+                console.log('Creating payment:', {
+                    amount: amount,
+                    giftId: "{{ gift.id }}",
+                    auth: {
+                        startParam: authData.startParam ? 'present' : 'missing',
+                        refreshToken: authData.refresh_token ? 'present' : 'missing',
+                        initData: authData.initData ? 'present' : 'missing'
+                    }
+                });
+
+                loadingUtils.show();
+
+                // Всегда используем API бэкенда для создания платежа
+                const response = await AuthManager.fetchWithAuth(
+                    `/twa/api/payments/{{ gift.id }}/pay`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            amount: amount,
+                            // Улучшаем определение платформы
+                            platform: window.Telegram?.WebApp ? 'webapp' : 'web'
+                        })
+                    }
+                );
+
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Payment failed');
+                }
+                
+                // Remove the check for data.payment_url
+                // and show a success message to the user
+                loadingUtils.showMessage('Payment request sent. Check your Telegram messages.');
+
+            } catch (error) {
+                console.error('Payment error:', error);
+                loadingUtils.showMessage(error.message || 'Payment failed. Please try again.');
+            } finally {
+                loadingUtils.hide();
+            }
+        }
+
+        // Делаем функции глобально доступными
+        window.handlePayment = handlePayment;
+        window.handleCustomPayment = handleCustomPayment;
+    });
+</script>
+{% endblock %}

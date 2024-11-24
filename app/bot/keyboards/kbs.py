@@ -8,8 +8,7 @@ def main_keyboard(webapp_url: str) -> InlineKeyboardMarkup:
 
     kb.button(text="🎮 Start", web_app=WebAppInfo(url=webapp_url))
     kb.button(text="🏆 My gift lists", web_app=WebAppInfo(url=f"{settings.BASE_SITE}/giftlists"))
-    # kb.button(text="📈 My friend lists", callback_data="show_my_record")
-
+    # kb.button(text="🔄 My friend lists", callback_data="show_my_record")
     kb.adjust(1)
     return kb.as_markup()
 

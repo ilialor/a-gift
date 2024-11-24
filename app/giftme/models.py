@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy import ARRAY, JSON, ForeignKey, Integer, String, Table, Enum, Text, text, Column, DateTime, BigInteger, PrimaryKeyConstraint
+from sqlalchemy import ARRAY, JSON, ForeignKey, Integer, String, Table, Enum, Text, UniqueConstraint, text, Column, DateTime, BigInteger, PrimaryKeyConstraint, Boolean, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from app.dao.database import Base, uniq_str_an, array_or_none_an
@@ -39,6 +39,11 @@ class User(Base):
         secondary='calendar_participants',
         back_populates='participants'
     )
+    contacts: Mapped[List["Contact"]] = relationship(
+        "Contact",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
 
 class Profile(Base):
     first_name: Mapped[str]
@@ -66,9 +71,9 @@ class UserList(Base):
 
     name: Mapped[str] = mapped_column(String(), nullable=False)
     description: Mapped[str | None] = mapped_column(String(), nullable=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'))
-    gift_list_id: Mapped[int] = mapped_column(ForeignKey('giftlists.id', ondelete='CASCADE'))
-    added_user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'))
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    gift_list_id: Mapped[int | None] = mapped_column(ForeignKey('giftlists.id', ondelete='CASCADE'), nullable=True)
+    added_user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
 
     added_user = relationship('User', foreign_keys=[added_user_id])
     gift_list = relationship('GiftList', back_populates='groups')
@@ -99,21 +104,24 @@ class Gift(Base):
     )
     
     def to_dict(self) -> dict:
+        total_paid = sum(payment.amount for payment in self.payments)
         return {
             "id": self.id,
             "name": self.name,
             "description": self.description,
             "price": self.price,
             "owner_id": self.owner_id,
+            "paid_amount": total_paid
         }
 
 class Payment(Base):
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey('users.id'), nullable=False)
     amount: Mapped[float]
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
     user: Mapped['User'] = relationship('User', back_populates='payments')
     gift_id: Mapped[int] = mapped_column(ForeignKey('gifts.id'), nullable=False)
     gift: Mapped['Gift'] = relationship('Gift', back_populates='payments')
+    telegram_payment_charge_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
 # Association table for GiftList and Gift
 gift_list_gift = Table(
@@ -231,3 +239,32 @@ calendar_gift = Table(
     Column('calendar_id', ForeignKey('calendar_events.id', ondelete='CASCADE'), primary_key=True),
     Column('gift_id', ForeignKey('gifts.id', ondelete='CASCADE'), primary_key=True)
 )
+
+class Contact(Base):    
+    """Модель для хранения контактов пользователя"""
+    __tablename__ = 'contacts'
+
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'))
+    contact_telegram_id: Mapped[int] = mapped_column(BigInteger)
+    username: Mapped[str | None]
+    first_name: Mapped[str]
+    last_name: Mapped[str | None]
+
+    # Связи
+    user: Mapped["User"] = relationship("User", back_populates="contacts", foreign_keys=[user_id])
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'contact_telegram_id', name='uq_user_contact'),
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "contact_telegram_id": self.contact_telegram_id,
+            "username": self.username,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
+        }

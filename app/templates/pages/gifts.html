@@ -1,106 +1,287 @@
 {% extends "base.html" %} {% block title %}GiftMe - {{ page_title }}{% endblock
 %} {% block content %}
-<header class="header">
+
+<div class="header">
   <div class="profile-section">
-    <a href="/" class="nav-button">←</a>
+    <a href="/twa/" class="nav-button">←</a>
     <div class="profile-pic"></div>
-    <div>{{ user.username }}</div>
+    <div>{% if user %}{{ user.username }}{% else %}Guest{% endif %}</div>
   </div>
-  <input type="search" class="search-bar" placeholder="Search..." />
-  <button class="nav-button">⋮</button>
-</header>
+  <div>⋮</div>
+</div>
 
-<main class="p-4">
+<div class="p-4" role="main">
   <h1 class="text-2xl font-bold mb-4">{{ page_title }}</h1>
-  <div class="bg-teal-900 bg-opacity-20 rounded-xl p-4 backdrop-blur-sm">
-    <p>{{ page_title }} page.</p>
-  </div>
 
-  <!-- Add Gift Creation Form -->
-  <div class="mt-6">
+  <div class="bg-teal-900 bg-opacity-20 rounded-xl p-4 backdrop-blur-sm">
     <h2 class="text-xl font-semibold mb-2">Create a New Gift</h2>
-    <form id="create-gift-form" class="space-y-4">
-      <div>
-        <label for="gift-name" class="block text-sm font-medium"
-          >Gift Name</label
-        >
+    <form id="giftForm" class="space-y-4">
+      <div class="space-y-2">
+        <label for="name" class="block">Gift Name</label>
         <input
           type="text"
-          id="gift-name"
+          id="name"
           name="name"
           required
-          class="mt-1 block w-full border border-gray-300 rounded-md p-2"
+          class="w-full p-2 rounded bg-white bg-opacity-10 border border-teal-500 text-white"
         />
       </div>
-      <div>
-        <label for="gift-description" class="block text-sm font-medium"
-          >Description</label
-        >
+
+      <div class="space-y-2">
+        <label for="description" class="block">Description</label>
         <textarea
-          id="gift-description"
+          id="description"
           name="description"
           required
-          class="mt-1 block w-full border border-gray-300 rounded-md p-2"
+          class="w-full p-2 rounded bg-white bg-opacity-10 border border-teal-500 text-white"
         ></textarea>
       </div>
-      <div>
-        <label for="gift-price" class="block text-sm font-medium">Price</label>
+
+      <div class="space-y-2">
+        <label for="price" class="block">Price</label>
         <input
           type="number"
-          id="gift-price"
+          id="price"
           name="price"
           step="0.01"
           required
-          class="mt-1 block w-full border border-gray-300 rounded-md p-2"
+          class="w-full p-2 rounded bg-white bg-opacity-10 border border-teal-500 text-white"
         />
       </div>
-      <button type="submit" class="px-4 py-2 bg-teal-600 text-white rounded-md">
+
+      <button
+        type="submit"
+        class="w-full py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors"
+      >
         Add Gift
       </button>
     </form>
   </div>
-</main>
+
+  <div class="mt-8">
+    <h2 class="text-xl font-semibold mb-4">My Gifts</h2>
+    <div class="space-y-4">
+      {% for gift in gifts %}
+      <div class="bg-teal-900 bg-opacity-10 rounded-xl p-4">
+        <div class="flex justify-between items-start mb-2">
+          <h3 class="text-lg font-bold">{{ gift.name }}</h3>
+          <div class="flex space-x-2">
+            <a
+              href="#"
+              onclick="shareGift('{{ gift.id }}', '{{ gift.name }}');"
+              class="bg-teal-600 text-white px-3 py-1 rounded-lg flex items-center text-sm hover:bg-teal-700"
+            >
+              <span class="mr-1">🔗</span>Share
+            </a>
+            <button
+              onclick="addToWishlist('{{ gift.id }}')"
+              class="bg-teal-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-teal-700"
+            >
+              + List
+            </button>
+            <button
+              onclick="payForGift({{ gift.id }})"
+              class="bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Pay with Telegram Stars
+            </button>
+          </div>
+        </div>
+        <p class="text-gray-300">{{ gift.description }}</p>
+        <p class="text-teal-300 mt-2">
+          Price: ${{ gift.price }}<br />
+          Paid: ${{ gift.paid_amount }}
+        </p>
+        {% if gift.lists %}
+        <div class="mt-4 space-y-2">
+          <p class="text-sm text-gray-400">In lists:</p>
+          {% for list in gift.lists %}
+          <div
+            class="flex justify-between items-center bg-teal-900 bg-opacity-30 p-2 rounded-lg"
+          >
+            <span>{{ list.name }}</span>
+            <button
+              onclick="shareList('{{ list.id }}', '{{ list.name }}')"
+              class="bg-teal-600 text-white px-2 py-1 rounded text-sm hover:bg-teal-700 flex items-center"
+            >
+              <span class="mr-1">🔗</span>Share
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% else %}
+      <p class="text-center text-gray-400">You have no gifts yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
 
 <nav class="bottom-nav">
   <button class="nav-button">≡</button>
   <button class="nav-button">🎧</button>
   <button class="nav-button">🔔</button>
-  <input type="text" class="message-input" placeholder="Message..." />
   <button class="nav-button">📤</button>
 </nav>
+
 {% endblock %} {% block extra_scripts %}
+<script src="https://telegram.org/js/telegram-widget.js?22"></script>
 <script>
-  const currentUserId = { $user_id };
+  document.addEventListener('DOMContentLoaded', () => {
+      // Get bot username from template context
+      const botUsername = '{{ bot_username }}';
+      
+      if (!window.Telegram?.WebApp) {
+          console.warn('Telegram WebApp is not available. Running in web mode.');
+      }
 
-  document
-    .getElementById("create-gift-form")
-    .addEventListener("submit", async function (event) {
-      event.preventDefault();
+      const currentUserId = {{ user.id }};
+      console.log('currentUserId:', currentUserId, 'platform:', window.Telegram?.WebApp?.platform || 'web');
 
-      const name = document.getElementById("gift-name").value;
-      const description = document.getElementById("gift-description").value;
-      const price = parseFloat(document.getElementById("gift-price").value);
+      function createGiftElement(gift) {
+          const giftDiv = document.createElement('div');
+          giftDiv.className = 'bg-teal-900 bg-opacity-10 rounded-xl p-4';
+          giftDiv.innerHTML = `
+              <div class="flex justify-between items-start mb-2">
+                  <h3 class="text-lg font-bold">${gift.name}</h3>
+                  <div class="flex space-x-2">
+                      <a href="#" onclick="shareGift('${gift.id}', '${gift.name}');"
+                         class="bg-teal-600 text-white px-3 py-1 rounded-lg flex items-center text-sm hover:bg-teal-700">
+                          <span class="mr-1">🔗</span>Share
+                      </a>
+                      <button onclick="addToWishlist('${gift.id}')"
+                              class="bg-teal-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-teal-700">
+                          + List
+                      </button>
+                      <button onclick="payForGift(${gift.id})" class="bg-blue-500 text-white px-4 py-2 rounded">Pay with Telegram Stars</button>
+                  </div>
+              </div>
+              <p class="text-gray-300">${gift.description}</p>
+              <p class="text-teal-300 mt-2">
+                  Price: $${gift.price}<br>
+                  Paid: $${gift.paid_amount}
+              </p>
+          `;
+          return giftDiv;
+      }
 
-      const response = await fetch("/gifts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name,
-          description,
-          price,
-          owner_id: currentUserId, // Use the current user's ID as owner_id
-        }),
+      window.shareGift = function(giftId, giftName) {
+          // Используем корректный формат параметра startapp
+          const shareUrl = encodeURIComponent(`https://t.me/${botUsername}?start=startapp_gifts_${giftId}`);
+          const text = encodeURIComponent(`I really love this! ${giftName}!`);
+          window.open(`https://t.me/share/url?url=${shareUrl}&text=${text}`, '_blank');
+      };
+
+      window.shareList = function(listId, listName) {
+          const shareUrl = `${window.location.origin}/lists/${listId}`;
+          if (window.Telegram?.WebApp) {
+              window.Telegram.WebApp.switchInlineQuery(
+                  `Check out my gift list: ${listName}!\n${shareUrl}`,
+                  ['users', 'groups']
+              );
+          }
+      };
+
+      const form = document.getElementById('giftForm');
+      form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+
+          const formData = new FormData(form);
+          const giftData = {
+              name: formData.get('name'),
+              description: formData.get('description'),
+              price: parseFloat(formData.get('price')),
+              owner_id: currentUserId
+          };
+
+          try {
+              const response = await AuthManager.fetchWithAuth('/twa/api/gifts', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(giftData)
+              });
+
+              if (response.ok) {
+                  const gift = await response.json();
+                  console.log('Gift created:', gift);
+
+                  const giftsContainer = document.querySelector('.mt-8 .space-y-4');
+                  const emptyMessage = giftsContainer.querySelector('p.text-center');
+                  if (emptyMessage) {
+                      emptyMessage.remove();
+                  }
+                  giftsContainer.insertBefore(createGiftElement(gift), giftsContainer.firstChild);
+
+                  form.reset();
+
+                  if (window.Telegram?.WebApp) {
+                      window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                      window.Telegram.WebApp.showAlert('Gift was successfully created!');
+                  }
+              } else {
+                  const error = await response.json();
+                  console.error('Error creating gift:', error);
+
+                  if (window.Telegram?.WebApp) {
+                      window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+                      window.Telegram.WebApp.showAlert(error.detail || 'Failed to create gift');
+                  } else {
+                      alert('Error creating gift: ' + error.detail);
+                  }
+              }
+          } catch (error) {
+              console.error('Error:', error);
+
+              if (window.Telegram?.WebApp) {
+                  window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+                  window.Telegram.WebApp.showAlert('Failed to create gift. Please try again.');
+              } else {
+                  alert('Error creating gift');
+              }
+          }
       });
 
-      if (response.ok) {
-        alert("Gift added successfully!");
-        // Refresh the page without triggering the form submission again
-        window.location.reload();
-      } else {
-        alert("Failed to add gift.");
-      }
-    });
+      window.addToWishlist = function(giftId) {
+          console.log('Adding gift to wishlist:', giftId);
+          const url = AuthManager.addParamsToUrl(`/twa/wishlist?gift_id=${giftId}`);
+          window.location.href = url;
+      };
+
+      window.payForGift = function(giftId) {
+          const url = AuthManager.addParamsToUrl(`/twa/api/payments/${giftId}/pay`);
+          fetch(url, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  ...AuthManager.addAuthHeaders()  // Include authentication headers
+              },
+          })
+          .then(async response => {
+              const data = await response.json();
+              if (response.ok) {
+                  if (window.Telegram?.WebApp) {
+                      window.Telegram.WebApp.showAlert('Payment request sent. Check your Telegram messages.');
+                  } else {
+                      alert('Payment request sent. Check your Telegram messages.');
+                  }
+              } else {
+                  throw new Error(data.detail || 'Failed to initiate payment');
+              }
+          })
+          .catch(error => {
+              console.error('Payment error:', error);
+              if (window.Telegram?.WebApp) {
+                  window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+                  window.Telegram.WebApp.showAlert(error.message);
+              } else {
+                  alert(error.message);
+              }
+          });
+      };
+
+  });
 </script>
 {% endblock %}
