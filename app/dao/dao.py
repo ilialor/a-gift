@@ -16,7 +16,6 @@ class UserDAO(BaseDAO[User]):
     async def find_one_or_none(session: AsyncSession, filters: UserFilterPydantic) -> Optional[User]:
         result = await session.execute(select(User).filter_by(**filters.dict()))
         user = result.scalars().first()
-        # logging.info(f"UserDAO.find_one_or_none found user: {user.to_dict() if user else 'None'}")
         return user
 
     @classmethod
