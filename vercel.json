@@ -1,16 +1,15 @@
 {
   "version": 2,
   "functions": {
-    "app/vercel_test.py": {
-      "memory": 1024,
-      "maxDuration": 60,
-      "runtime": "python@3.12"
+    "api/app.py": {
+      "memory": 1024
     }
   },
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/app/vercel_test.py"
+      "dest": "app/vercel_test.py"
     }
   ]
 }
+
