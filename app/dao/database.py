@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_
 
 from app.config import settings
 
-DATABASE_URL = settings.get_db_url()
+DATABASE_URL = settings.get_db_url() + "?sslmode=require"
 
 # Создаем асинхронный движок для работы с базой данных
 engine = create_async_engine(url=DATABASE_URL)
