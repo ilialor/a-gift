@@ -22,3 +22,4 @@ app/static/main_page1.png
 app/static/.jshintrc
 app/static/js/GroupList.js
 app/static/js/global.d.ts
+app/tests/test_db_connection.py
