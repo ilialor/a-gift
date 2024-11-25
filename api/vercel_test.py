@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 import os
 
 app = FastAPI()
@@ -56,11 +57,11 @@ class GiftCreate(BaseModel):
 async def create_gift(gift: GiftCreate):
     async with async_session() as session:
         try:
-            query = "INSERT INTO gifts (name, description, price, owner_id) VALUES (:name, :description, :price, :owner_id) RETURNING id"
-            result = await session.execute(query, gift.dict())
+            query = text("INSERT INTO gifts (name, description, price, owner_id) VALUES (:name, :description, :price, :owner_id) RETURNING id")
+            result = await session.execute(query, gift.model_dump())
             gift_id = result.scalar_one()
             await session.commit()
-            return {"id": gift_id, **gift.dict()}
+            return {"id": gift_id, **gift.model_dump()}
         except Exception as e:
             await session.rollback()
             raise HTTPException(status_code=500, detail=str(e))
