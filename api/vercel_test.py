@@ -64,44 +64,45 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 @app.post("/api/users")
-async def create_user(user: UserCreate, profile: ProfileCreate, session: AsyncSession = Depends(get_session)):
-    try:
-        query_user = text("""
-            INSERT INTO users (username, telegram_id) 
-            VALUES (:username, :telegram_id) 
-            RETURNING id
-        """)
-        result = await session.execute(query_user, user.model_dump())
-        user_id = result.scalar_one()
-        
-        query_profile = text("""
-            INSERT INTO profiles (user_id, first_name, last_name) 
-            VALUES (:user_id, :first_name, :last_name)
-        """)
-        await session.execute(query_profile, {
-            "user_id": user_id,
-            "first_name": profile.first_name,
-            "last_name": profile.last_name
-        })
-        
-        await session.commit()
-        return {"id": user_id, **user.model_dump()}
-    except Exception as e:
-        await session.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+async def create_user(user: UserCreate, profile: ProfileCreate):
+    async with AsyncSessionLocal() as session:
+        try:
+            async with session.begin():
+                query_user = text("""
+                    INSERT INTO users (username, telegram_id) 
+                    VALUES (:username, :telegram_id) 
+                    RETURNING id
+                """)
+                result = await session.execute(query_user, user.model_dump())
+                user_id = result.scalar_one()
+                
+                query_profile = text("""
+                    INSERT INTO profiles (user_id, first_name, last_name) 
+                    VALUES (:user_id, :first_name, :last_name)
+                """)
+                await session.execute(query_profile, {
+                    "user_id": user_id,
+                    "first_name": profile.first_name,
+                    "last_name": profile.last_name
+                })
+                
+            return {"id": user_id, **user.model_dump()}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/gifts", response_model=GiftResponse)
-async def create_gift(gift: GiftCreate, session: AsyncSession = Depends(get_session)):
-    try:
-        query = text("""
-            INSERT INTO gifts (name, description, price, owner_id) 
-            VALUES (:name, :description, :price, :owner_id) 
-            RETURNING id, name, description, price, owner_id
-        """)
-        result = await session.execute(query, gift.model_dump())
-        gift_data = result.mappings().one()
-        await session.commit()
-        return GiftResponse(**gift_data)
-    except Exception as e:
-        await session.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+async def create_gift(gift: GiftCreate):
+    async with AsyncSessionLocal() as session:
+        try:
+            async with session.begin():
+                query = text("""
+                    INSERT INTO gifts (name, description, price, owner_id) 
+                    VALUES (:name, :description, :price, :owner_id) 
+                    RETURNING id, name, description, price, owner_id
+                """)
+                result = await session.execute(query, gift.model_dump())
+                gift_data = result.mappings().one()
+            
+            return GiftResponse(**gift_data)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
