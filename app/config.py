@@ -1,7 +1,5 @@
-import os
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 class Settings(BaseSettings):
     DB_USER: str
@@ -19,18 +17,16 @@ class Settings(BaseSettings):
     TELEGRAM_API_HASH: str
     TELEGRAM_PHONE: str
     
-    # DATABASE_SQLITE = 'sqlite+aiosqlite:///data/db.sqlite3'
-    model_config = SettingsConfigDict(
-        env_file=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
-    )
+    model_config = SettingsConfigDict(env_file=".env")
 
-    def get_db_url(self):
-        return (f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@"
-                f"{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}")
-
+    def get_db_url(self) -> str:
+        """Возвращает URL для подключения к Neon DB"""
+        return (
+            f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@"
+            f"{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        )
     def get_webhook_url(self) -> str:
         """Возвращает URL вебхука с кодированием специальных символов."""
         return f"{self.BASE_SITE}/webhook"
-        
+    
 settings = Settings()
-database_url = settings.get_db_url()
