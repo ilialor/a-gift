@@ -1,2 +1,3 @@
-GiftMe Telegram Mini App (Prototype)
-see @giftme_bot
+# GiftMe Telegram Mini App (Prototype)
+
+Visit @giftme_bot
