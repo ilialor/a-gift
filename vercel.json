@@ -9,6 +9,6 @@
     "env": {
       "PYTHONPATH": ".",
       "MAX_WORKERS": "1",
-      "python_version": "3.12"
+      "PYTHON_VERSION": "3.12"
     }
   }
