@@ -6,7 +6,7 @@
         "use": "@vercel/python",
         "config": {
           "runtime": "python3.12",
-          "handler": "main.handler",
+          "handler": "app:app",
           "buildCommand": "pip install -r requirements.txt",
           "installCommand": "pip install -r requirements.txt"
         }
