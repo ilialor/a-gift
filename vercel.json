@@ -1,13 +1,14 @@
 {
-  "version": 2,
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "app/main.py"
+    "version": 2,
+    "routes": [
+      {
+        "src": "/(.*)",
+        "dest": "app/main.py"
+      }
+    ],
+    "env": {
+      "PYTHONPATH": ".",
+      "MAX_WORKERS": "1",
+      "python_version": "3.12"
     }
-  ],
-  "env": {
-    "PYTHONPATH": ".",
-    "MAX_WORKERS": "1"
   }
-}
