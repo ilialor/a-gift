@@ -2,7 +2,7 @@
     "version": 2,
     "builds": [
       {
-        "src": "app/main.py",
+        "src": "app/vercel_test.py",
         "use": "@vercel/python",
         "config": {
           "runtime": "python3.12",
@@ -15,11 +15,13 @@
     "routes": [
       {
         "src": "/(.*)",
-        "dest": "app/main.py"
+        "dest": "app/vercel_test.py"
       }
     ],
-    "env": {
-      "PYTHONPATH": ".",
-      "MAX_WORKERS": "1"
+    "functions": {
+      "app/vercel_test.py": {
+        "memory": 1024,
+        "maxDuration": 60
+      }
     }
   }
