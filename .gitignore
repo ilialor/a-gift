@@ -24,3 +24,4 @@ app/static/js/GroupList.js
 app/static/js/global.d.ts
 app/tests/test_db_connection.py
 .vercel
+app/doc/postman-collection-updated.json
