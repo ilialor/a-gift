@@ -1,5 +1,15 @@
 {
     "version": 2,
+    "builds": [
+      {
+        "src": "app/main.py",
+        "use": "@vercel/python",
+        "config": {
+          "runtime": "python3.12",
+          "handler": "main.handler"
+        }
+      }
+    ],
     "routes": [
       {
         "src": "/(.*)",
@@ -8,7 +18,6 @@
     ],
     "env": {
       "PYTHONPATH": ".",
-      "MAX_WORKERS": "1",
-      "PYTHON_VERSION": "3.12"
+      "MAX_WORKERS": "1"
     }
   }

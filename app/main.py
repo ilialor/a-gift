@@ -16,6 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Добавляем конфигурацию для корректной работы на Vercel
+app = FastAPI()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,11 +57,9 @@ app.include_router(twa_router)
 
 async def log_requests(request: Request, call_next):
     logging.info(f"Incoming request: method={request.method}, url={request.url}")
-    # logging.info(f"Request headers: {dict(request.headers)}")
     response = await call_next(request)
     logging.info(f"Response status: {response.status_code}")
     return response
-
 
 @app.post("/webhook")
 async def webhook(request: Request) -> None:
@@ -68,3 +68,10 @@ async def webhook(request: Request) -> None:
     await dp.feed_update(bot, update)
     logging.info("Update processed")
 
+# Добавляем handler для корневого пути
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "GiftMe Bot API is running"}
+
+# Экспортируем handler для Vercel
+handler = app
