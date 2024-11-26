@@ -5,9 +5,21 @@
       "src": "api/vercel_test.py",
       "use": "@vercel/python",
       "config": { "handler": "handler" }
+    },
+    {
+      "src": "api/static/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
+    {
+      "src": "/favicon.ico",
+      "dest": "api/static/favicon.ico"
+    },
+    {
+      "src": "/static/(.*)",
+      "dest": "api/static/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "api/vercel_test.py"
