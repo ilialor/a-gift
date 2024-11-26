@@ -3,22 +3,13 @@
   "builds": [
     {
       "src": "api/vercel_test.py",
-      "use": "@vercel/python",
-      "config": { "handler": "handler" }
-    },
-    {
-      "src": "api/static/**",
-      "use": "@vercel/static"
+      "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/favicon.ico",
       "dest": "api/static/favicon.ico"
-    },
-    {
-      "src": "/static/(.*)",
-      "dest": "api/static/$1"
     },
     {
       "src": "/(.*)",
