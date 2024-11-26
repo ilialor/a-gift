@@ -95,7 +95,7 @@ async def health():
         
         return {
             "status": "healthy",
-            "version": "1.0.3",
+            "version": "1.0.4",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "database": db_status,
             "environment": os.getenv("VERCEL_ENV", "development")
@@ -132,7 +132,7 @@ async def health():
 #             raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/users")
+@app.post("/api/users")
 async def create_user(user_data: dict):
     """
     Create a new user with profile
@@ -214,7 +214,72 @@ async def create_user(user_data: dict):
             status_code=500,
             detail="Internal server error"
         )
-    
+
+# Эндпоинты для работы с подарками
+@app.get("/api/users/{user_id}")
+async def get_user(user_id: int):
+    async with AsyncSessionLocal() as session:
+        try:
+            query = text("""
+                SELECT u.id, u.username, u.telegram_id, 
+                       p.first_name, p.last_name
+                FROM users u
+                LEFT JOIN profiles p ON u.id = p.user_id
+                WHERE u.id = :user_id
+            """)
+            result = await session.execute(query, {"user_id": user_id})
+            user = result.mappings().first()
+            
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            return {
+                "id": user["id"],
+                "username": user["username"],
+                "telegram_id": user["telegram_id"],
+                "profile": {
+                    "first_name": user["first_name"],
+                    "last_name": user["last_name"]
+                }
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/gifts/{gift_id}")
+async def get_gift(gift_id: int):
+    async with AsyncSessionLocal() as session:
+        try:
+            query = text("""
+                SELECT id, name, description, price, owner_id 
+                FROM gifts 
+                WHERE id = :gift_id
+            """)
+            result = await session.execute(query, {"gift_id": gift_id})
+            gift = result.mappings().first()
+            
+            if not gift:
+                raise HTTPException(status_code=404, detail="Gift not found")
+            
+            return gift
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/users/{user_id}/gifts")
+async def get_user_gifts(user_id: int):
+    async with AsyncSessionLocal() as session:
+        try:
+            query = text("""
+                SELECT id, name, description, price, owner_id 
+                FROM gifts 
+                WHERE owner_id = :user_id
+            """)
+            result = await session.execute(query, {"user_id": user_id})
+            gifts = result.mappings().all()
+            
+            return gifts
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
 # Эндпоинты для работы с подарками
 @app.post("/api/gifts")
 async def create_gift(gift: GiftCreate):
