@@ -8,6 +8,10 @@
   ],
   "routes": [
     {
+      "src": "/webhook",
+      "dest": "api/vercel_test.py"
+    },
+    {
       "src": "/static/(.*)",
       "dest": "/static/$1"
     },
@@ -15,7 +19,10 @@
       "src": "/favicon.ico",
       "dest": "api/static/favicon.ico"
     },
-    
+    {
+      "src": "/api/(.*)",
+      "dest": "api/vercel_test.py"
+    },
     {
       "src": "/(.*)",
       "dest": "api/vercel_test.py"
