@@ -26,3 +26,4 @@ app/tests/test_db_connection.py
 .vercel
 app/doc/postman-collection-updated.json
 api/vercel_test1.py
+api/vercel_test2.py
