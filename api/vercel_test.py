@@ -34,58 +34,107 @@ class UserProfileCreate(BaseModel):
     user: dict
     profile: dict
 
+@app.get("/api/users/{user_id}")
+async def get_user(user_id: int):
+    """Получение пользователя по ID"""
+    async with AsyncSessionLocal() as session:
+        try:
+            # Получаем пользователя и его профиль одним запросом
+            query = text("""
+                SELECT u.id, u.username, u.telegram_id, 
+                       p.first_name, p.last_name
+                FROM users u
+                LEFT JOIN profiles p ON u.id = p.user_id
+                WHERE u.id = :user_id
+            """)
+            
+            result = await session.execute(query, {"user_id": user_id})
+            user_data = result.mappings().first()
+            
+            if not user_data:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            return {
+                "id": user_data["id"],
+                "username": user_data["username"],
+                "telegram_id": user_data["telegram_id"],
+                "profile": {
+                    "first_name": user_data["first_name"],
+                    "last_name": user_data["last_name"]
+                }
+            }
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/users")
 async def create_user(user_data: UserProfileCreate):
     """Создание нового пользователя с профилем"""
-    try:
-        # Создаем объект профиля
-        profile = ProfilePydantic(
-            first_name=user_data.profile.get("first_name"),
-            last_name=user_data.profile.get("last_name")
-        )
-
-        # Создаем объект пользователя
-        user = UserPydantic(
-            username=user_data.user["username"],
-            telegram_id=user_data.user["telegram_id"],
-            profile=profile
-        )
-
-        async with AsyncSessionLocal() as session:
-            async with session.begin():
+    async with AsyncSessionLocal() as session:
+        async with session.begin():
+            try:
                 # Проверяем существование пользователя
-                existing_user = await UserDAO.find_one_or_none(
-                    session=session,
-                    filters={"telegram_id": user.telegram_id}
+                check_query = text("""
+                    SELECT id FROM users 
+                    WHERE telegram_id = :telegram_id
+                """)
+                result = await session.execute(
+                    check_query, 
+                    {"telegram_id": user_data.user["telegram_id"]}
                 )
-                
-                if existing_user:
+                if result.scalar_one_or_none():
                     raise HTTPException(
                         status_code=409,
                         detail="User with this telegram_id already exists"
                     )
 
-                # Создаем нового пользователя
-                new_user = await UserDAO.add(session=session, values=user)
+                # Создаем пользователя
+                create_user_query = text("""
+                    INSERT INTO users (username, telegram_id)
+                    VALUES (:username, :telegram_id)
+                    RETURNING id
+                """)
+                result = await session.execute(
+                    create_user_query,
+                    {
+                        "username": user_data.user["username"],
+                        "telegram_id": user_data.user["telegram_id"]
+                    }
+                )
+                user_id = result.scalar_one()
+
+                # Создаем профиль
+                create_profile_query = text("""
+                    INSERT INTO profiles (user_id, first_name, last_name)
+                    VALUES (:user_id, :first_name, :last_name)
+                """)
+                await session.execute(
+                    create_profile_query,
+                    {
+                        "user_id": user_id,
+                        "first_name": user_data.profile["first_name"],
+                        "last_name": user_data.profile.get("last_name")
+                    }
+                )
+
                 await session.commit()
-                
+
                 return {
-                    "id": new_user.id,
-                    "username": new_user.username,
-                    "telegram_id": new_user.telegram_id,
+                    "id": user_id,
+                    "username": user_data.user["username"],
+                    "telegram_id": user_data.user["telegram_id"],
                     "profile": {
-                        "first_name": new_user.profile.first_name,
-                        "last_name": new_user.profile.last_name
+                        "first_name": user_data.profile["first_name"],
+                        "last_name": user_data.profile.get("last_name")
                     }
                 }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error"
-        )
+            except HTTPException:
+                await session.rollback()
+                raise
+            except Exception as e:
+                await session.rollback()
+                raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 async def health():
@@ -147,34 +196,34 @@ async def root():
 
 
 
-@app.get("/api/users/{user_id}")
-async def get_user(user_id: int):
-    async with AsyncSessionLocal() as session:
-        try:
-            query = text("""
-                SELECT u.id, u.username, u.telegram_id, 
-                       p.first_name, p.last_name
-                FROM users u
-                LEFT JOIN profiles p ON u.id = p.user_id
-                WHERE u.id = :user_id
-            """)
-            result = await session.execute(query, {"user_id": user_id})
-            user = result.mappings().first()
+# @app.get("/api/users/{user_id}")
+# async def get_user(user_id: int):
+#     async with AsyncSessionLocal() as session:
+#         try:
+#             query = text("""
+#                 SELECT u.id, u.username, u.telegram_id, 
+#                        p.first_name, p.last_name
+#                 FROM users u
+#                 LEFT JOIN profiles p ON u.id = p.user_id
+#                 WHERE u.id = :user_id
+#             """)
+#             result = await session.execute(query, {"user_id": user_id})
+#             user = result.mappings().first()
             
-            if not user:
-                raise HTTPException(status_code=404, detail="User not found")
+#             if not user:
+#                 raise HTTPException(status_code=404, detail="User not found")
             
-            return {
-                "id": user["id"],
-                "username": user["username"],
-                "telegram_id": user["telegram_id"],
-                "profile": {
-                    "first_name": user["first_name"],
-                    "last_name": user["last_name"]
-                }
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+#             return {
+#                 "id": user["id"],
+#                 "username": user["username"],
+#                 "telegram_id": user["telegram_id"],
+#                 "profile": {
+#                     "first_name": user["first_name"],
+#                     "last_name": user["last_name"]
+#                 }
+#             }
+#         except Exception as e:
+#             raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/gifts/{gift_id}")
 async def get_gift(gift_id: int):
