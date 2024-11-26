@@ -132,7 +132,7 @@ async def health():
 #             raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/users")
+@app.get("/api/users")
 async def create_user(user_data: dict):
     """
     Create a new user with profile
