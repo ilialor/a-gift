@@ -7,16 +7,47 @@ from pydantic import BaseModel
 from typing import AsyncGenerator
 from aiogram.types import Update, LabeledPrice
 from sqlalchemy import text
+from contextlib import asynccontextmanager
+from app.bot.create_bot import bot, dp, stop_bot, start_bot
+from app.bot.handlers.router import router as bot_router
+from app.config import settings
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from app.dao.dao import UserDAO
 from app.bot.create_bot import bot, dp
+from app.middleware.auth import TelegramWebAppMiddleware
 
-from app.giftme.schemas import GiftCreate, UserPydantic, ProfilePydantic
+from app.giftme.schemas import GiftCreate
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Управление жизненным циклом бота"""
+    try:
+        dp.include_router(bot_router)
+        await start_bot()
+        
+        # Устанавливаем вебхук только если мы не в режиме разработки
+        if not settings.IS_DEV:
+            webhook_url = settings.get_webhook_url()
+            await bot.set_webhook(
+                url=webhook_url,
+                allowed_updates=dp.resolve_used_update_types(),
+                drop_pending_updates=True
+            )
+    except Exception as e:
+        e        
+    yield  # Приложение работает
+    
+    try:
+        if not settings.IS_DEV:
+            await bot.delete_webhook()
+        await stop_bot()
+    except Exception as e:
+        e
+
+# Создаем приложение FastAPI
+app = FastAPI(lifespan=lifespan)
 # Базовая настройка FastAPI
-app = FastAPI()
 
 # CORS
 app.add_middleware(
@@ -26,9 +57,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(TelegramWebAppMiddleware)
+
 app.mount('/static', StaticFiles(directory='app/static'), name='static')
-
-
 
 # Настройка базы данных
 DATABASE_URL = f"postgresql+asyncpg://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
@@ -158,7 +190,7 @@ async def health():
         
         return {
             "status": "healthy",
-            "version": "1.0.5",
+            "version": "1.0.6",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "database": db_status,
             "environment": os.getenv("VERCEL_ENV", "development")
