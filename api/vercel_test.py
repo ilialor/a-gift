@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -6,6 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from typing import AsyncGenerator
 import os
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -39,13 +47,16 @@ class GiftResponse(BaseModel):
 
 @app.get("/")
 async def root():
+    logger.info("API is running")
     return {"status": "ok", "message": "GiftMe Bot API is running"}
 
 @app.get("/health")
 async def health():
+    logger.info("Health check OK")
     return {
         "status": "healthy",
-        "version": "1.0.1",
+        "version": "1.0.2",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "database": "configured"
     }
 
