@@ -16,6 +16,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.bot.create_bot import bot, dp
 from app.middleware.auth import TelegramWebAppMiddleware
+from app.giftme.router import router as giftme_router
+from app.twa.router import router as twa_router
 
 from app.giftme.schemas import GiftCreate
 
@@ -52,11 +54,15 @@ app = FastAPI(lifespan=lifespan)
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://web.telegram.org"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Подключаем роутеры
+app.include_router(giftme_router)
+app.include_router(twa_router)
 
 app.add_middleware(TelegramWebAppMiddleware)
 
