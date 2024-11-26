@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -102,32 +102,48 @@ async def health():
 
 # Эндпоинты для работы с пользователями
 @app.post("/api/users")
-async def create_user(user: UserCreate, profile: ProfileCreate):
-    async with AsyncSessionLocal() as session:
-        try:
-            async with session.begin():
-                query_user = text("""
-                    INSERT INTO users (username, telegram_id) 
-                    VALUES (:username, :telegram_id) 
-                    RETURNING id
-                """)
-                result = await session.execute(query_user, user.model_dump())
-                user_id = result.scalar_one()
-                
-                query_profile = text("""
-                    INSERT INTO profiles (user_id, first_name, last_name) 
-                    VALUES (:user_id, :first_name, :last_name)
-                """)
-                await session.execute(query_profile, {
-                    "user_id": user_id,
-                    "first_name": profile.first_name,
-                    "last_name": profile.last_name
-                })
-                
-            return {"id": user_id, **user.model_dump()}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
+async def create_user(
+    user_data: dict,  # Принимаем весь JSON как dict
+    session: AsyncSession = Depends(AsyncSessionLocal)
+):
+    try:
+        async with session.begin():
+            # Извлекаем данные пользователя и профиля из запроса
+            user = user_data["user"]
+            profile = user_data["profile"]
+            
+            # Создаем пользователя
+            query_user = text("""
+                INSERT INTO users (username, telegram_id) 
+                VALUES (:username, :telegram_id) 
+                RETURNING id
+            """)
+            result = await session.execute(
+                query_user, 
+                {"username": user["username"], "telegram_id": user["telegram_id"]}
+            )
+            user_id = result.scalar_one()
+            
+            # Создаем профиль
+            query_profile = text("""
+                INSERT INTO profiles (user_id, first_name, last_name) 
+                VALUES (:user_id, :first_name, :last_name)
+            """)
+            await session.execute(query_profile, {
+                "user_id": user_id,
+                "first_name": profile["first_name"],
+                "last_name": profile["last_name"]
+            })
+            
+        return {
+            "id": user_id,
+            "username": user["username"],
+            "telegram_id": user["telegram_id"],
+            "profile": profile
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 # Эндпоинты для работы с подарками
 @app.post("/api/gifts")
 async def create_gift(gift: GiftCreate):
