@@ -1,26 +1,26 @@
-import logging
+# import logging
 import json
 from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Path, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+# from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
 import os
-import sys
+# import sys
 
 # Настройка логирования
-logger = logging.getLogger("vercel_api")
-logger.setLevel(logging.INFO)
+# logger = logging.getLogger("vercel_api")
+# logger.setLevel(logging.INFO)
 
-# Добавляем вывод в stdout для Vercel
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+# # Добавляем вывод в stdout для Vercel
+# handler = logging.StreamHandler(sys.stdout)
+# handler.setLevel(logging.INFO)
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# handler.setFormatter(formatter)
+# logger.addHandler(handler)
 
 app = FastAPI()
 
@@ -41,16 +41,16 @@ app.add_middleware(
 )
 
 # Middleware для логирования запросов
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    logger.info(f"Incoming request: {request.method} {request.url}")
-    logger.info(f"Client IP: {request.client.host}")
-    logger.info(f"Headers: {dict(request.headers)}")
+# @app.middleware("http")
+# async def log_requests(request: Request, call_next):
+#     logger.info(f"Incoming request: {request.method} {request.url}")
+#     logger.info(f"Client IP: {request.client.host}")
+#     logger.info(f"Headers: {dict(request.headers)}")
     
-    response = await call_next(request)
+#     response = await call_next(request)
     
-    logger.info(f"Response status: {response.status_code}")
-    return response
+#     logger.info(f"Response status: {response.status_code}")
+#     return response
 
 class UserCreate(BaseModel):
     username: str
@@ -68,7 +68,7 @@ class GiftCreate(BaseModel):
 
 @app.get("/")
 async def root():
-    logger.info("Root endpoint called")
+    # logger.info("Root endpoint called")
     return {
         "status": "ok",
         "message": "GiftMe Bot API is running",
@@ -77,7 +77,7 @@ async def root():
 
 @app.get("/health")
 async def health():
-    logger.info("Health check endpoint called")
+    # logger.info("Health check endpoint called")
     try:
         # Проверяем наличие переменных окружения
         db_config = {
@@ -86,20 +86,20 @@ async def health():
             "database": os.getenv("DB_NAME"),
         }
         db_status = "configured" if all(db_config.values()) else "not configured"
-        logger.info(f"Database status: {db_status}")
+        # logger.info(f"Database status: {db_status}")
         
         response_data = {
             "status": "healthy",
-            "version": "1.0.2",
+            "version": "1.0.3",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "database": db_status,
             "environment": os.getenv("VERCEL_ENV", "development")
         }
-        logger.info(f"Health check response: {json.dumps(response_data)}")
+        # logger.info(f"Health check response: {json.dumps(response_data)}")
         return response_data
     
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
+        # logger.error(f"Health check failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Настройка подключения к базе данных
@@ -107,17 +107,18 @@ try:
     DATABASE_URL = f"postgresql+asyncpg://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
     engine = create_async_engine(DATABASE_URL, echo=True)
     AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    logger.info("Database connection configured successfully")
+    # logger.info("Database connection configured successfully")
 except Exception as e:
-    logger.error(f"Failed to configure database connection: {str(e)}")
+    raise
+    # logger.error(f"Failed to configure database connection: {str(e)}")
 
 @app.post("/api/users")
 async def create_user(user: UserCreate, profile: ProfileCreate):
-    logger.info(f"Creating new user: {user.username}")
+    # logger.info(f"Creating new user: {user.username}")
     async with AsyncSessionLocal() as session:
         try:
             async with session.begin():
-                logger.debug(f"Starting user creation transaction")
+                # logger.debug(f"Starting user creation transaction")
                 
                 # Создаем пользователя
                 query_user = text("""
@@ -127,7 +128,7 @@ async def create_user(user: UserCreate, profile: ProfileCreate):
                 """)
                 result = await session.execute(query_user, user.model_dump())
                 user_id = result.scalar_one()
-                logger.info(f"Created user with ID: {user_id}")
+                # logger.info(f"Created user with ID: {user_id}")
                 
                 # Создаем профиль
                 query_profile = text("""
@@ -139,16 +140,16 @@ async def create_user(user: UserCreate, profile: ProfileCreate):
                     "first_name": profile.first_name,
                     "last_name": profile.last_name
                 })
-                logger.info(f"Created profile for user ID: {user_id}")
+                # logger.info(f"Created profile for user ID: {user_id}")
                 
             return {"id": user_id, **user.model_dump()}
         except Exception as e:
-            logger.error(f"Error creating user: {str(e)}")
+            # logger.error(f"Error creating user: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/gifts")
 async def create_gift(gift: GiftCreate):
-    logger.info(f"Creating new gift: {gift.name}")
+    # logger.info(f"Creating new gift: {gift.name}")
     async with AsyncSessionLocal() as session:
         try:
             async with session.begin():
@@ -157,12 +158,12 @@ async def create_gift(gift: GiftCreate):
                     VALUES (:name, :description, :price, :owner_id) 
                     RETURNING id, name, description, price, owner_id
                 """)
-                logger.debug(f"Executing gift creation query with data: {gift.model_dump()}")
+                # logger.debug(f"Executing gift creation query with data: {gift.model_dump()}")
                 result = await session.execute(query, gift.model_dump())
                 gift_data = result.mappings().one()
-                logger.info(f"Created gift with ID: {gift_data['id']}")
+                # logger.info(f"Created gift with ID: {gift_data['id']}")
             
             return gift_data
         except Exception as e:
-            logger.error(f"Error creating gift: {str(e)}")
+            # logger.error(f"Error creating gift: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
