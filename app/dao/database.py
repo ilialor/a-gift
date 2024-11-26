@@ -21,7 +21,7 @@ array_or_none_an = Annotated[List[str] | None, mapped_column(ARRAY(String))]
 
 # Базовый класс для всех моделей
 class Base(AsyncAttrs, DeclarativeBase):
-    __abstract__ = True  # Класс абстрактный, чтобы не создавать отдельную таблицу для него
+    __abstract__ = True  
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
