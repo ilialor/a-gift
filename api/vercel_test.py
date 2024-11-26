@@ -1,18 +1,17 @@
 from datetime import datetime, timezone
-from fastapi import Depends, FastAPI, HTTPException, Request
+import os
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from aiogram.types import Update, LabeledPrice
+from sqlalchemy import text
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import text
-import os
-from aiogram.types import Update, LabeledPrice
-from contextlib import asynccontextmanager
-from app.bot.create_bot import bot, dp, stop_bot, start_bot
-from app.bot.handlers.router import router as bot_router
 from app.dao.dao import UserDAO
-from app.dao.session_maker import async_session_maker
-from app.giftme.schemas import ProfilePydantic
+from app.bot.create_bot import bot, dp
+
+from app.giftme.schemas import GiftCreate, UserPydantic, ProfilePydantic
 
 # Базовая настройка FastAPI
 app = FastAPI()
@@ -26,65 +25,71 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Контекстный менеджер жизненного цикла приложения
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Управление жизненным циклом бота"""
-    try:
-        dp.include_router(bot_router)
-        await start_bot()
-        
-        # Устанавливаем вебхук только если мы не в режиме разработки
-        if not os.getenv("IS_DEV"):
-            webhook_url = f"{os.getenv('BASE_SITE')}/webhook"
-            await bot.set_webhook(
-                url=webhook_url,
-                allowed_updates=dp.resolve_used_update_types(),
-                drop_pending_updates=True
-            )
-    except Exception:
-        pass
-        
-    yield
-    
-    try:
-        if not os.getenv("IS_DEV"):
-            await bot.delete_webhook()
-        await stop_bot()
-    except Exception:
-        pass
-
-# Модели данных
-class UserCreate(BaseModel):
-    username: str
-    telegram_id: int
-
-class ProfileCreate(BaseModel):
-    first_name: str
-    last_name: str | None = None
-
-class GiftCreate(BaseModel):
-    name: str
-    description: str
-    price: float
-    owner_id: int
-
 # Настройка базы данных
 DATABASE_URL = f"postgresql+asyncpg://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
 engine = create_async_engine(DATABASE_URL)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-# Базовые эндпоинты
-@app.get("/")
-async def root():
-    return {
-        "status": "ok",
-        "message": "GiftMe Bot API is running",
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
+class UserProfileCreate(BaseModel):
+    user: dict
+    profile: dict
+
+@app.post("/api/users")
+async def create_user(user_data: UserProfileCreate):
+    """Создание нового пользователя с профилем"""
+    try:
+        # Создаем объект профиля
+        profile = ProfilePydantic(
+            first_name=user_data.profile.get("first_name"),
+            last_name=user_data.profile.get("last_name")
+        )
+
+        # Создаем объект пользователя
+        user = UserPydantic(
+            username=user_data.user["username"],
+            telegram_id=user_data.user["telegram_id"],
+            profile=profile
+        )
+
+        async with AsyncSessionLocal() as session:
+            async with session.begin():
+                # Проверяем существование пользователя
+                existing_user = await UserDAO.find_one_or_none(
+                    session=session,
+                    filters={"telegram_id": user.telegram_id}
+                )
+                
+                if existing_user:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="User with this telegram_id already exists"
+                    )
+
+                # Создаем нового пользователя
+                new_user = await UserDAO.add(session=session, values=user)
+                await session.commit()
+                
+                return {
+                    "id": new_user.id,
+                    "username": new_user.username,
+                    "telegram_id": new_user.telegram_id,
+                    "profile": {
+                        "first_name": new_user.profile.first_name,
+                        "last_name": new_user.profile.last_name
+                    }
+                }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
 
 @app.get("/health")
 async def health():
+    """Проверка работоспособности сервиса"""
     try:
         db_config = {
             "user": os.getenv("DB_USER"),
@@ -95,13 +100,22 @@ async def health():
         
         return {
             "status": "healthy",
-            "version": "1.0.4",
+            "version": "1.0.5",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "database": db_status,
             "environment": os.getenv("VERCEL_ENV", "development")
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Health check failed")
+
+# Эндпоинт для корневого пути
+@app.get("/")
+async def root():
+    return {
+        "status": "ok",
+        "message": "GiftMe Bot API is running",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
 # Эндпоинты для работы с пользователями
 # @app.post("/api/users")
@@ -132,90 +146,7 @@ async def health():
 #             raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/users")
-async def create_user(user_data: dict):
-    """
-    Create a new user with profile
-    
-    Expected format:
-    {
-        "user": {
-            "username": str,
-            "telegram_id": int
-        },
-        "profile": {
-            "first_name": str,
-            "last_name": str (optional)
-        }
-    }
-    """
-    try:
-        # Validate input data
-        if "user" not in user_data or "profile" not in user_data:
-            raise HTTPException(
-                status_code=422,
-                detail="Both user and profile data are required"
-            )
 
-        user_info = user_data["user"]
-        profile_info = user_data["profile"]
-
-        # Create profile model
-        profile = ProfilePydantic(
-            first_name=profile_info["first_name"],
-            last_name=profile_info.get("last_name")
-        )
-
-        # Create user model with profile
-        user_create = UserCreate(
-            username=user_info["username"],
-            telegram_id=user_info["telegram_id"],
-            profile=profile
-        )
-
-        async with async_session_maker() as session:
-            # Check if user already exists
-            existing_user = await UserDAO.find_one_or_none(
-                session=session,
-                filters={"telegram_id": user_info["telegram_id"]}
-            )
-            
-            if existing_user:
-                raise HTTPException(
-                    status_code=409,
-                    detail="User with this telegram_id already exists"
-                )
-
-            # Create new user
-            try:
-                new_user = await UserDAO.add(session=session, values=user_create)
-                await session.commit()
-                
-                return {
-                    "id": new_user.id,
-                    "username": new_user.username,
-                    "telegram_id": new_user.telegram_id,
-                    "profile": {
-                        "first_name": new_user.profile.first_name,
-                        "last_name": new_user.profile.last_name
-                    }
-                }
-            except Exception as e:
-                await session.rollback()
-                raise HTTPException(
-                    status_code=500,
-                    detail="Error creating user"
-                )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error"
-        )
-
-# Эндпоинты для работы с подарками
 @app.get("/api/users/{user_id}")
 async def get_user(user_id: int):
     async with AsyncSessionLocal() as session:
