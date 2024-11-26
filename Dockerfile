@@ -18,8 +18,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копируем код приложения
 COPY . .
 
+# Проверяем и настраиваем статические файлы
+RUN mkdir -p app/static && \
+    chmod -R 755 app/static
+
 # Создаем пользователя без root-прав
-RUN adduser --disabled-password --gecos '' appuser
+RUN adduser --disabled-password --gecos '' appuser && \
+    chown -R appuser:appuser /app
 USER appuser
 
 # Определяем порт, который будет слушать приложение

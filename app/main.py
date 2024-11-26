@@ -54,9 +54,11 @@ async def lifespan(app: FastAPI):
 # Создаем приложение FastAPI
 app = FastAPI(lifespan=lifespan)
 
+# Настройка для раздачи статических файлов с правильным путем
+app.mount("/static", StaticFiles(directory="app/static", html=True), name="static")
+
 # Добавляем middleware
 app.add_middleware(TelegramWebAppMiddleware)
-app.mount('/static', StaticFiles(directory='app/static'), name='static')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://web.telegram.org"],
