@@ -12,7 +12,7 @@ from app.bot.create_bot import bot, dp, stop_bot, start_bot
 from app.bot.handlers.router import router as bot_router
 from app.dao.dao import UserDAO
 from app.dao.session_maker import async_session_maker
-from schemas import ProfilePydantic
+from app.giftme.schemas import ProfilePydantic
 
 # Базовая настройка FastAPI
 app = FastAPI()
