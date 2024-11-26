@@ -25,11 +25,11 @@ logger.addHandler(handler)
 app = FastAPI()
 
 # Определяем путь к директории static
-static_dir = Path(__file__).parent / "static"
-static_dir.mkdir(exist_ok=True)  # Создаем директорию, если её нет
+# static_dir = Path(__file__).parent / "static"
+# static_dir.mkdir(exist_ok=True)  # Создаем директорию, если её нет
 
-# Монтируем статические файлы
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+# # Монтируем статические файлы
+# app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Добавляем CORS middleware
 app.add_middleware(

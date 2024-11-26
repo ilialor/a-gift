@@ -8,9 +8,14 @@
   ],
   "routes": [
     {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
       "src": "/favicon.ico",
       "dest": "api/static/favicon.ico"
     },
+    
     {
       "src": "/(.*)",
       "dest": "api/vercel_test.py"
