@@ -10,6 +10,9 @@ from aiogram.types import Update, LabeledPrice
 from contextlib import asynccontextmanager
 from app.bot.create_bot import bot, dp, stop_bot, start_bot
 from app.bot.handlers.router import router as bot_router
+from dao import UserDAO
+from app.dao.session_maker import async_session_maker
+from schemas import ProfilePydantic
 
 # Базовая настройка FastAPI
 app = FastAPI()
@@ -101,48 +104,116 @@ async def health():
         raise HTTPException(status_code=500, detail=str(e))
 
 # Эндпоинты для работы с пользователями
-@app.post("/api/users")
-async def create_user(
-    user_data: dict,  # Принимаем весь JSON как dict
-    session: AsyncSession = Depends(AsyncSessionLocal)
-):
-    try:
-        async with session.begin():
-            # Извлекаем данные пользователя и профиля из запроса
-            user = user_data["user"]
-            profile = user_data["profile"]
-            
-            # Создаем пользователя
-            query_user = text("""
-                INSERT INTO users (username, telegram_id) 
-                VALUES (:username, :telegram_id) 
-                RETURNING id
-            """)
-            result = await session.execute(
-                query_user, 
-                {"username": user["username"], "telegram_id": user["telegram_id"]}
-            )
-            user_id = result.scalar_one()
-            
-            # Создаем профиль
-            query_profile = text("""
-                INSERT INTO profiles (user_id, first_name, last_name) 
-                VALUES (:user_id, :first_name, :last_name)
-            """)
-            await session.execute(query_profile, {
-                "user_id": user_id,
-                "first_name": profile["first_name"],
-                "last_name": profile["last_name"]
-            })
-            
-        return {
-            "id": user_id,
-            "username": user["username"],
-            "telegram_id": user["telegram_id"],
-            "profile": profile
+# @app.post("/api/users")
+# async def create_user(user: UserCreate, profile: ProfileCreate):
+#     async with AsyncSessionLocal() as session:
+#         try:
+#             async with session.begin():
+#                 query_user = text("""
+#                     INSERT INTO users (username, telegram_id) 
+#                     VALUES (:username, :telegram_id) 
+#                     RETURNING id
+#                 """)
+#                 result = await session.execute(query_user, user.model_dump())
+#                 user_id = result.scalar_one()
+                
+#                 query_profile = text("""
+#                     INSERT INTO profiles (user_id, first_name, last_name) 
+#                     VALUES (:user_id, :first_name, :last_name)
+#                 """)
+#                 await session.execute(query_profile, {
+#                     "user_id": user_id,
+#                     "first_name": profile.first_name,
+#                     "last_name": profile.last_name
+#                 })
+                
+#             return {"id": user_id, **user.model_dump()}
+#         except Exception as e:
+#             raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/users")
+async def create_user(user_data: dict):
+    """
+    Create a new user with profile
+    
+    Expected format:
+    {
+        "user": {
+            "username": str,
+            "telegram_id": int
+        },
+        "profile": {
+            "first_name": str,
+            "last_name": str (optional)
         }
+    }
+    """
+    try:
+        # Validate input data
+        if "user" not in user_data or "profile" not in user_data:
+            raise HTTPException(
+                status_code=422,
+                detail="Both user and profile data are required"
+            )
+
+        user_info = user_data["user"]
+        profile_info = user_data["profile"]
+
+        # Create profile model
+        profile = ProfilePydantic(
+            first_name=profile_info["first_name"],
+            last_name=profile_info.get("last_name")
+        )
+
+        # Create user model with profile
+        user_create = UserCreate(
+            username=user_info["username"],
+            telegram_id=user_info["telegram_id"],
+            profile=profile
+        )
+
+        async with async_session_maker() as session:
+            # Check if user already exists
+            existing_user = await UserDAO.find_one_or_none(
+                session=session,
+                filters={"telegram_id": user_info["telegram_id"]}
+            )
+            
+            if existing_user:
+                raise HTTPException(
+                    status_code=409,
+                    detail="User with this telegram_id already exists"
+                )
+
+            # Create new user
+            try:
+                new_user = await UserDAO.add(session=session, values=user_create)
+                await session.commit()
+                
+                return {
+                    "id": new_user.id,
+                    "username": new_user.username,
+                    "telegram_id": new_user.telegram_id,
+                    "profile": {
+                        "first_name": new_user.profile.first_name,
+                        "last_name": new_user.profile.last_name
+                    }
+                }
+            except Exception as e:
+                await session.rollback()
+                raise HTTPException(
+                    status_code=500,
+                    detail="Error creating user"
+                )
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
     
 # Эндпоинты для работы с подарками
 @app.post("/api/gifts")
