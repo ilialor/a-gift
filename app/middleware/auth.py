@@ -14,7 +14,7 @@ class TelegramWebAppMiddleware(BaseHTTPMiddleware):
         self.auth_manager = TWAAuthManager(settings.secret_key)
         self.telegram_validator = TelegramWebAppValidator(settings.BOT_TOKEN)
 
-    async def __call__(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next):
         try:
             if request.url.path.startswith('/twa/'):
                 # Get all possible auth parameters
