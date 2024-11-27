@@ -1,30 +1,27 @@
-# Используем Python 3.12 как базовый образ
+# Use Python 3.12 slim image
 FROM python:3.12-slim
 
-# Устанавливаем рабочую директорию
+# Set the working directory
 WORKDIR /app
 
-# Устанавливаем системные зависимости
+# Set the environment variables
 RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем файлы зависимостей
-COPY requirements.txt .
+# Copy the entire project first
+COPY . .
 
-# Устанавливаем зависимости Python
+# Install the dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем только содержимое папки app в /app
-COPY app/ .
-
-# Создаем пользователя без root-прав
+# Create user without root privileges
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-# Определяем порт, который будет слушать приложение
+# Set the port
 EXPOSE 8000
 
-# Запускаем приложение
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application
+CMD cd /app && uvicorn main:app --host 0.0.0.0 --port 8000
