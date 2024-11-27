@@ -116,7 +116,7 @@ async def main_page(
         bot_info = await telegram_bot.get_me()
         logging.info(f"User authenticated: {user.username}")
 
-        return templates.TemplateResponse("templates/pages/index.html", {
+        return templates.TemplateResponse("pages/index.html", {
             "request": request,
             "user": user,
             "bot_username": bot_info.username
@@ -269,7 +269,7 @@ async def gifts_page(request: Request):
         # Get bot information for sharing
         bot_info = await telegram_bot.get_me()
         
-    return templates.TemplateResponse("templates/pages/gifts.html", {
+    return templates.TemplateResponse("pages/gifts.html", {
         "request": request,
         "user": user,
         "gifts": gifts,
