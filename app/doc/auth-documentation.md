@@ -90,7 +90,7 @@ async def cmd_start(message: types.Message):
 
 ```python
 class TelegramWebAppMiddleware:
-    async def dispatch(request: Request):
+    async def __call__(request: Request):
         # Get auth parameters
         init_data = request.query_params.get('initData')
         start_param = request.query_params.get('tgWebAppStartParam')

@@ -57,7 +57,7 @@ app = FastAPI(lifespan=lifespan)
 
 # Add HTTPS redirect middleware in production
 if not settings.IS_DEV:
-    app.add_middleware(CustomHTTPSRedirectMiddleware)
+    app.add_middleware(CustomHTTPSRedirectMiddleware, exclude_paths=["/webhook", "/twa/error"])
 
 # Настройка для раздачи статических файлов с правильным путем
 app.mount("/static", StaticFiles(directory="app/static", html=True, check_dir=True), name="static")
