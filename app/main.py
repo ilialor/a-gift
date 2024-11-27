@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from aiogram.types import Update
-from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+from app.middleware.https import CustomHTTPSRedirectMiddleware
 
 from app.bot.create_bot import bot, dp, stop_bot, start_bot
 from app.bot.handlers.router import router as bot_router
@@ -57,7 +57,7 @@ app = FastAPI(lifespan=lifespan)
 
 # Add HTTPS redirect middleware in production
 if not settings.IS_DEV:
-    app.add_middleware(HTTPSRedirectMiddleware)
+    app.add_middleware(CustomHTTPSRedirectMiddleware)
 
 # Настройка для раздачи статических файлов с правильным путем
 app.mount("/static", StaticFiles(directory="app/static", html=True, check_dir=True), name="static")

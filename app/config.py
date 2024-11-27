@@ -31,7 +31,10 @@ class Settings(BaseSettings):
 
     def get_webhook_url(self) -> str:
         """Возвращает URL вебхука с кодированием специальных символов."""
-        return f"{self.BASE_SITE}/webhook"
+        base_url = self.BASE_SITE
+        if not base_url.startswith('https://'):
+            base_url = f"https://{base_url}"
+        return f"{base_url}/webhook"
         
 settings = Settings()
 database_url = settings.get_db_url()
