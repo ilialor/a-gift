@@ -1,40 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Use relative paths and add crossorigin attribute -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/main.css') }}"
+      crossorigin="anonymous"
+    />
+    <script
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+      crossorigin="anonymous"
+    ></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    
-    <!-- Calendar Component Script -->
-    <script src="{{ url_for('static', path='js/components/Calendar.js') }}"></script>
-    <!-- Change path to favicon -->
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='favicon.ico') }}">
-</head>
-<body>
+
+    <!-- Add defer and type attributes -->
+    <script
+      src="{{ url_for('static', path='js/components/Calendar.js') }}"
+      defer
+      type="text/javascript"
+      crossorigin="anonymous"
+    ></script>
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="{{ url_for('static', path='favicon.ico') }}"
+      crossorigin="anonymous"
+    />
+  </head>
+  <body>
     <div class="light-dots"></div>
-    <div class="content-wrapper">
-        {% block content %}{% endblock %}
-    </div>
+    <div class="content-wrapper">{% block content %}{% endblock %}</div>
     {% block extra_scripts %}{% endblock %}
 
     <!-- Include auth.js at the end of the body -->
-    <script src="{{ url_for('static', path='js/auth.js') }}" defer></script>
+    <script
+      src="{{ url_for('static', path='js/auth.js') }}"
+      defer
+      type="text/javascript"
+      crossorigin="anonymous"
+    ></script>
 
     <script>
-        // Initialize both auth and calendar on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            // Получаем имя бота из серверного рендеринга
-            AuthManager.setBotUsername('{{ bot_username }}');
-            // Initialize calendar if the container exists
-            const calendarRoot = document.getElementById('calendar-root');
+      document.addEventListener("DOMContentLoaded", () => {
+        // Wait for AuthManager and Calendar to be defined
+        const initApp = () => {
+          if (
+            typeof AuthManager !== "undefined" &&
+            typeof Calendar !== "undefined"
+          ) {
+            AuthManager.setBotUsername("{{ bot_username }}");
+            const calendarRoot = document.getElementById("calendar-root");
             if (calendarRoot) {
-                ReactDOM.render(React.createElement(Calendar), calendarRoot);
+              ReactDOM.render(React.createElement(Calendar), calendarRoot);
             }
-        });
+          } else {
+            setTimeout(initApp, 100); // Retry after 100ms
+          }
+        };
+        initApp();
+      });
     </script>
-</body>
+  </body>
 </html>

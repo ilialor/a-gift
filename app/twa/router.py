@@ -1,6 +1,6 @@
 import logging
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from pydantic import BaseModel
@@ -116,11 +116,15 @@ async def main_page(
         bot_info = await telegram_bot.get_me()
         logging.info(f"User authenticated: {user.username}")
 
-        return templates.TemplateResponse("pages/index.html", {
+        response = templates.TemplateResponse("pages/index.html", {
             "request": request,
             "user": user,
             "bot_username": bot_info.username
         })
+        # Add security headers
+        response.headers["Content-Security-Policy"] = "upgrade-insecure-requests"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
     except Exception as e:
         logging.error(f"Error in main_page: {e}")

@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from aiogram.types import Update
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 
 from app.bot.create_bot import bot, dp, stop_bot, start_bot
 from app.bot.handlers.router import router as bot_router
@@ -54,14 +55,18 @@ async def lifespan(app: FastAPI):
 # Создаем приложение FastAPI
 app = FastAPI(lifespan=lifespan)
 
+# Add HTTPS redirect middleware in production
+if not settings.IS_DEV:
+    app.add_middleware(HTTPSRedirectMiddleware)
+
 # Настройка для раздачи статических файлов с правильным путем
-app.mount("/static", StaticFiles(directory="app/static", html=True), name="static")
+app.mount("/static", StaticFiles(directory="app/static", html=True, check_dir=True), name="static")
 
 # Добавляем middleware
 app.add_middleware(TelegramWebAppMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://web.telegram.org"],
+    allow_origins=["https://web.telegram.org", "https://giftme-avalabs.amvera.io"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
