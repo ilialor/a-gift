@@ -16,7 +16,7 @@ from app.middleware.auth import TelegramWebAppMiddleware
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname=s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,11 @@ app = FastAPI(lifespan=lifespan)
 
 # Add HTTPS redirect middleware in production
 if not settings.IS_DEV:
-    app.add_middleware(CustomHTTPSRedirectMiddleware, exclude_paths=["/webhook", "/twa/error"])
+    app.add_middleware(
+        CustomHTTPSRedirectMiddleware, 
+        exclude_paths=["/webhook", "/twa/error"],
+        exclude_hosts=["giftme-avalabs.amvera.io"]  # Add your production domain
+    )
 
 # Настройка для раздачи статических файлов с правильным путем
 app.mount("/static", StaticFiles(directory="app/static", html=True, check_dir=True), name="static")

@@ -17,6 +17,11 @@ class TelegramWebAppMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         try:
             if request.url.path.startswith('/twa/'):
+                # Add host header check
+                host = request.headers.get("host", "")
+                if not request.url.scheme == "https" and host == "giftme-avalabs.amvera.io":
+                    request.scope["scheme"] = "https"
+
                 # Get all possible auth parameters
                 start_param = (
                     request.query_params.get('startParam') or 

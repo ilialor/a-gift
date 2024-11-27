@@ -4,10 +4,11 @@ from starlette.datastructures import URL
 from starlette.responses import RedirectResponse
 
 class CustomHTTPSRedirectMiddleware(HTTPSRedirectMiddleware):
-    def __init__(self, app, *, exclude_paths=None):
+    def __init__(self, app, *, exclude_paths=None, exclude_hosts=None):
         super().__init__(app)
         self.exclude_paths = exclude_paths or ["/webhook"]
-        self.redirect_status_code = 307  # Add this line
+        self.exclude_hosts = exclude_hosts or []
+        self.redirect_status_code = 307
 
     async def __call__(self, scope, receive, send) -> None:
         if scope["type"] not in ("http", "websocket"):
@@ -15,14 +16,12 @@ class CustomHTTPSRedirectMiddleware(HTTPSRedirectMiddleware):
             return
 
         request = Request(scope)
-        
-        # Исключаем определенные пути из HTTPS редиректа
-        if request.url.path in self.exclude_paths:
-            await self.app(scope, receive, send)
-            return
-
         url = URL(scope=scope)
-        if url.scheme == "https":
+
+        # Skip HTTPS redirect for excluded paths and hosts
+        if (request.url.path in self.exclude_paths or
+            request.headers.get("host") in self.exclude_hosts or
+            url.scheme == "https"):
             await self.app(scope, receive, send)
             return
 
