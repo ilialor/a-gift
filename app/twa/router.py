@@ -97,8 +97,12 @@ async def main_page(
     startParam: Optional[str] = None,
     refresh_token: Optional[str] = None
 ):
+    logging.info(f"Main page request: startParam={bool(startParam)}, refresh_token={bool(refresh_token)}")
+    logging.info(f"Request headers: {dict(request.headers)}")
+    
     try:
         if not startParam or not refresh_token:
+            logging.error("Missing authentication parameters")
             return RedirectResponse(url="/twa/error?message=Missing+authentication+parameters")
 
         user_id = auth_manager.validate_token(startParam)
@@ -106,10 +110,13 @@ async def main_page(
         async with async_session_maker() as session:
             user = await UserDAO.find_by_id(session, user_id)
             if not user:
+                logging.error("User not found for id: {user_id}")
                 return RedirectResponse(url="/twa/error?message=User+not+found")
 
         bot_info = await telegram_bot.get_me()
-        return templates.TemplateResponse("pages/index.html", {
+        logging.info(f"User authenticated: {user.username}")
+
+        return templates.TemplateResponse("templates/pages/index.html", {
             "request": request,
             "user": user,
             "bot_username": bot_info.username
@@ -249,8 +256,10 @@ async def create_gift(request: Request, gift_data: GiftCreate):
 
 @router.get("/gifts")
 async def gifts_page(request: Request):
+    logging.info("twa/router: Gifts page request")
     user = request.state.user
     if not user:
+        logging.error("twa/router: User not found")
         return RedirectResponse(url="/twa/error?message=User+not+found")
 
     async with async_session_maker() as session:
@@ -260,7 +269,7 @@ async def gifts_page(request: Request):
         # Get bot information for sharing
         bot_info = await telegram_bot.get_me()
         
-    return templates.TemplateResponse("pages/gifts.html", {
+    return templates.TemplateResponse("templates/pages/gifts.html", {
         "request": request,
         "user": user,
         "gifts": gifts,
