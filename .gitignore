@@ -27,3 +27,6 @@ app/tests/test_db_connection.py
 app/doc/postman-collection-updated.json
 api/vercel_test1.py
 api/vercel_test2.py
+app/static/js/components/new_variant_calendar.js
+test_preview.py
+app/doc/cal.html

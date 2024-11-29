@@ -1,53 +1,193 @@
-{% extends "base.html" %}
-{% block title %}GiftMe - Dashboard{% endblock %}
-{% block content %}
-<div class="header">
-    <div class="profile-section">
-        <div class="profile-pic"></div>
-        <div>{{ user.username }}</div>
+{% extends "base.html" %} {% block title %}GiftMe - Dashboard{% endblock %} {%
+block content %}
+
+<header class="header">
+  <div class="profile-section">
+    <div class="profile-pic"></div>
+    <div class="username">{{ user.username }}</div>
+  </div>
+  <div class="search">
+    <i class="search-icon"><img src="/static/images/Loop.jpg" /></i>
+  </div>
+</header>
+
+<main>
+  <!-- Slider -->
+  <div class="slider-container">
+    <div class="slider">
+      <div class="slide-wrapper">
+        <div class="slide">
+          <img src="/static/images/top-gifts.jpg" alt="Top Unusual Gifts" />
+        </div>
+        <div class="slide">
+          <img src="/static/images/28-nov.jpg" alt="November 28" />
+        </div>
+        <div class="slide">
+          <img src="/static/images/top-gifts.jpg" alt="Top Unusual Gifts" />
+        </div>
+      </div>
     </div>
-    <div>⋮</div>
-</div>
-
-<div role="main">
-    <div class="feature-grid">
-        <a href="/twa/wishlist" class="feature-card">
-            <span class="feature-label">My Wishlist</span>
-        </a>
-        <a href="/twa/gifts" class="feature-card">
-            <span class="feature-label">Gifts</span>
-        </a>
+    <div class="slider-dots">
+      <span class="dot active"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
     </div>
+  </div>
 
-    <div class="feature-grid">
-        <a href="/twa/groups" class="feature-card">
-            <span class="feature-label">Groups</span>
-        </a>
-        <a href="/twa/contacts" class="feature-card">
-            <span class="feature-label">My Contacts</span>
-        </a>
-    </div>
+  <!-- Quick Actions -->
+  <div class="quick-actions">
+    <a href="/twa/groups" class="action-item">
+      <img src="/static/images/List.jpg" alt="list" />
+      <span class="action-label">My Lists</span>
+    </a>
+    <a href="/twa/contacts" class="action-item">
+      <img src="/static/images/Contacts.jpg" alt="list" />
+      <span class="action-label">Contacts</span>
+    </a>
+    <a href="/twa/gifts" class="action-item">
+      <img src="/static/images/Gift.jpg" alt="list" />
+      <span class="action-label">Gifts</span>
+    </a>
+  </div>
 
-    <!-- Calendar container -->
-    <div id="calendar-root" class="calendar-container"></div>
-</div>
+  <!-- Promo Banner -->
+  <div class="promo-banner">
+    <img
+      src="/static/images/ad-banner.svg"
+      alt="Flamenco Christmas Gift Card"
+    />
+  </div>
 
+  <!-- Calendar -->
+  <div id="calendar" class="calendar"></div>
+</main>
+
+<!-- Bottom Navigation -->
 <nav class="bottom-nav">
-    <button class="nav-button">≡</button>
-    <button class="nav-button">🎧</button>
-    <button class="nav-button">🔔</button>
-    <button class="nav-button">📤</button>
+  <a href="#" class="nav-button"><img src="/static/images/burger-menu.jpg" /></a>
+  <a href="#" class="nav-button"><img src="/static/images/headphone.jpg" /></a>
+  <a href="#" class="nav-button"><img src="/static/images/bell.jpg" /></a>
 </nav>
-{% endblock %}
 
-{% block extra_scripts %}
+{% endblock %} {% block extra_scripts %}
 <script>
-    // Additional calendar-specific initialization if needed
-    document.addEventListener('DOMContentLoaded', () => {
-        const calendarRoot = document.getElementById('calendar-root');
-        if (calendarRoot && !calendarRoot.hasChildNodes()) {
-            ReactDOM.render(React.createElement(Calendar), calendarRoot);
-        }
+  document.addEventListener("DOMContentLoaded", function () {
+    // Инициализация слайдера
+    const dots = document.querySelectorAll(".dot");
+    const slides = document.querySelectorAll(".slide");
+
+    dots.forEach((dot, index) => {
+      dot.addEventListener("click", () => {
+        dots.forEach((d) => d.classList.remove("active"));
+        dot.classList.add("active");
+        slides[index].scrollIntoView({ behavior: "smooth" });
+      });
     });
+
+    // Initialize calendar
+    new Calendar('calendar');
+  });
+
+  class Calendar {
+    constructor(containerID) {
+        this.container = document.getElementById(containerID);
+        this.date = new Date();
+        this.currentMonth = this.date.getMonth();
+        this.currentYear = this.date.getFullYear();
+        this.weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        this.months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+        this.init();
+    }
+
+    init() {
+        this.render();
+        this.addEventListeners();
+    }
+
+    render() {
+        const headerHTML = `
+            <div class="calendar-header">
+                <div class="calendar-nav">
+                    <button class="prev-month">&lt;</button>
+                </div>
+                <div class="calendar-title">
+                    ${this.months[this.currentMonth]} ${this.currentYear}
+                </div>
+                <div class="calendar-nav">
+                    <button class="next-month">&gt;</button>
+                </div>
+            </div>
+        `;
+
+        let gridHTML = '<div class="calendar-grid">';
+        
+        this.weekdays.forEach(day => {
+            gridHTML += `<div class="weekday">${day}</div>`;
+        });
+
+        const days = this.getDays();
+        days.forEach(day => {
+            const isWeekend = day.weekday === 5 || day.weekday === 6;
+            const classes = [
+                'day',
+                isWeekend ? 'weekend' : '',
+                day.isOtherMonth ? 'other-month' : '',
+                day.isToday ? 'today' : ''
+            ].filter(Boolean).join(' ');
+
+            gridHTML += `<div class="${classes}">${day.date}</div>`;
+        });
+
+        gridHTML += '</div>';
+        this.container.innerHTML = headerHTML + gridHTML;
+    }
+
+    getDays() {
+        const days = [];
+        const firstDay = new Date(this.currentYear, this.currentMonth, 1);
+        const lastDay = new Date(this.currentYear, this.currentMonth + 1, 0);
+        
+        let start = new Date(firstDay);
+        start.setDate(start.getDate() - (start.getDay() || 7) + 1);
+
+        const end = new Date(lastDay);
+        end.setDate(end.getDate() + (7 - (end.getDay() || 7)));
+
+        const today = new Date();
+        
+        while (start <= end) {
+            days.push({
+                date: start.getDate(),
+                weekday: start.getDay() || 7,
+                isOtherMonth: start.getMonth() !== this.currentMonth,
+                isToday: start.toDateString() === today.toDateString()
+            });
+            start.setDate(start.getDate() + 1);
+        }
+
+        return days;
+    }
+
+    addEventListeners() {
+        this.container.querySelector('.prev-month').addEventListener('click', () => {
+            this.currentMonth--;
+            if (this.currentMonth < 0) {
+                this.currentMonth = 11;
+                this.currentYear--;
+            }
+            this.render();
+        });
+
+        this.container.querySelector('.next-month').addEventListener('click', () => {
+            this.currentMonth++;
+            if (this.currentMonth > 11) {
+                this.currentMonth = 0;
+                this.currentYear++;
+            }
+            this.render();
+        });
+    }
+}
 </script>
 {% endblock %}

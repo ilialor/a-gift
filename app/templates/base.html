@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
     <title>{% block title %}{% endblock %}</title>
     <!-- Use relative paths and add crossorigin attribute -->
     <link
@@ -20,13 +21,6 @@
     ></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    <!-- Add defer and type attributes -->
-    <script
-      src="{{ url_for('static', path='js/components/Calendar.js') }}"
-      defer
-      type="text/javascript"
-      crossorigin="anonymous"
-    ></script>
     <link
       rel="icon"
       type="image/x-icon"

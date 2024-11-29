@@ -1,45 +1,27 @@
 :root {
   --primary-color: #1e3b35;
   --secondary-color: rgba(0, 255, 255, 0.2);
-  --text-color: #ffffff;
+  --text-color: #333333;
+  --background-color: #fdf7ed;
 }
 
 body {
   margin: 0;
   padding: 0;
   font-family: system-ui, -apple-system, sans-serif;
-  background-color: var(--primary-color);
+  background-color: var(--background-color);
   color: var(--text-color);
   min-height: 100vh;
 }
 
-.light-dots {
-  position: fixed;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  background-image: radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.1) 1px,
-    transparent 1px
-  );
-  background-size: 50px 50px;
-  z-index: 0;
-}
-
-.content-wrapper {
-  position: relative;
-  z-index: 1;
-}
-
 /* Header styles */
 .header {
+  background-color: white;
   padding: 1rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  background: rgba(30, 59, 53, 0.8);
-  backdrop-filter: blur(10px);
+  justify-content: space-between;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .profile-section {
@@ -52,130 +34,203 @@ body {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: #ffffff;
+  background-color: #e0e0e0;
 }
 
-.search-bar {
-  flex: 1;
-  padding: 0.5rem 1rem;
+/* Slider styles */
+.slider-container {
+  margin: 1rem;
   border-radius: 1rem;
-  border: 1px solid var(--secondary-color);
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-color);
-  backdrop-filter: blur(5px);
-}
-
-/* Feature grid styles */
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-  padding: 1rem;
-}
-
-.feature-card {
+  overflow: hidden;
   position: relative;
-  aspect-ratio: 16/9;
-  background: rgba(0, 255, 255, 0.1);
+  height: 120px; /* Фиксированная высота для всего слайдера */
+}
+
+.slider {
+  width: 100%;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.slide-wrapper {
+  display: flex; /* Меняем на flex для лучшего контроля размеров */
+  height: 100%;
+  width: fit-content; /* Позволяет wrapper растягиваться под содержимое */
+}
+
+.slide {
+  width: 160px; /* Фиксированная ширина слайда */
+  height: 100%; /* Занимает всю высоту контейнера */
+  flex: 0 0 auto; /* Запрещаем слайду сжиматься/растягиваться */
+  margin-right: 0.5rem;
+  position: relative;
+  background-color: white;
   border-radius: 1rem;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  cursor: pointer;
   overflow: hidden;
 }
 
-.feature-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 255, 255, 0.2);
+.slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 
-.feature-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(45deg, rgba(0, 255, 255, 0.1), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
+.slide-content {
+  padding: 1rem;
 }
 
-.feature-card:hover::before {
-  opacity: 1;
+.slider-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }
 
-.feature-label {
-  position: absolute;
-  bottom: 1rem;
-  left: 1rem;
-  color: white;
-  font-size: 1.1rem;
-  font-weight: 500;
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ccc;
+  cursor: pointer;
 }
 
-/* Navigation styles */
+.dot.active {
+  background-color: var(--primary-color);
+}
+
+/* Quick actions */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1rem;
+}
+
+.action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background-color: white;
+  border-radius: 1rem;
+  text-decoration: none;
+  color: var(--text-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Promo banner */
+.promo-banner {
+  margin-left: 5%;
+  margin-right: 5%;
+  padding: 0rem;
+  border-radius: 1rem;
+  
+}
+
+.promo-banner img {
+  width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
+/* Calendar */
+.calendar-container {
+  margin: 1rem;
+  padding: 1rem;
+  background-color: white;
+  border-radius: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex; /* Ensure the calendar displays as a flex container */
+  justify-content: center; /* Center the calendar horizontally */
+  align-items: center; /* Center the calendar vertically */
+}
+
+/* Bottom navigation */
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  width: 100%;
-  padding: 1rem;
+  left: 0;
+  right: 0;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(30, 59, 53, 0.95);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  justify-content: space-around;
+  padding: 1rem;
+  background-color: white;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .nav-button {
-  padding: 0.5rem;
+  font-size: 1.5rem;
   color: var(--text-color);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: opacity 0.3s ease;
+  text-decoration: none;
 }
 
-.nav-button:hover {
-  opacity: 0.8;
+/* Calendar styles */
+.calendar {
+    width: 300px;
+    border: 1px solid #ccc;
+    font-family: Arial, sans-serif;
+    padding: 10px;
+    background: white;
+    border-radius: 1rem;
+    margin: 1rem auto;
 }
 
-.message-input {
-  flex: 1;
-  margin: 0 1rem;
-  padding: 0.5rem 1rem;
-  border-radius: 1rem;
-  border: 1px solid var(--secondary-color);
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-color);
-  backdrop-filter: blur(5px);
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
 }
 
-/* Calendar Styling Enhancements */
-.bg-teal-900 {
-  background-color: #064e3b;
+.calendar-title {
+    font-weight: bold;
 }
 
-.hover\:bg-teal-700:hover {
-  background-color: #047857;
+.calendar-nav button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px 10px;
 }
 
-.text-red-400 {
-  color: #f87171;
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    text-align: center;
 }
 
-.rounded-full {
-  border-radius: 9999px;
+.weekday {
+    font-weight: bold;
+    color: #666;
+    padding: 5px;
 }
 
-.text-center {
-  text-align: center;
+.day {
+    padding: 5px;
+    cursor: pointer;
 }
 
-/* Ensure the grid layout aligns properly */
-.grid-cols-7 {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
+.day:hover {
+    background-color: #f0f0f0;
+}
+
+.weekend {
+    color: red;
+}
+
+.other-month {
+    color: #ccc;
+}
+
+.today {
+    background-color: #e6f3ff;
+    font-weight: bold;
 }
